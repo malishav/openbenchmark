@@ -7,6 +7,7 @@ import os
 import threading
 import time
 import traceback
+import signal
 
 from experiment_provisioner.main import Main as ExpProvisioner
 
@@ -27,6 +28,8 @@ class OrchestratorV2():
 
 		self.broker = broker
 		self.goOn = True
+
+		signal.signal(signal.SIGINT, self._signal_handler)
 
 		print "Broker: {0}".format(broker)
 
@@ -53,6 +56,10 @@ class OrchestratorV2():
 
 	def _on_mqtt_connect(self, client, userdata, flags, rc):
 		self.mqttClient.subscribe(self.OPENBENCHMARK_STARTBENCHMARK_REQUEST_TOPIC)
+
+	def _signal_handler(self, sig, frame):
+		print "Shutting down the deamon."
+		self.close()
 
 	def _on_mqtt_message(self, client, userdata, message):
 
