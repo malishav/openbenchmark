@@ -28,6 +28,7 @@ class OrchestratorV2():
 
 		self.broker = broker
 		self.goOn = True
+		self.threads = []
 
 		signal.signal(signal.SIGINT, self._signal_handler)
 
@@ -53,6 +54,8 @@ class OrchestratorV2():
 		self.goOn = False
 		if self.mqttClient:
 			self.mqttClient.loop_stop()
+		for thread in self.threads:
+			thread.close()
 
 	def _on_mqtt_connect(self, client, userdata, flags, rc):
 		self.mqttClient.subscribe(self.OPENBENCHMARK_STARTBENCHMARK_REQUEST_TOPIC)
@@ -80,12 +83,12 @@ class OrchestratorV2():
 
 			experimentId = ''.join(random.choice(string.ascii_lowercase) for i in range(10))
 
-			OrchestrateExperiment(broker=self.broker,
+			self.threads += [ OrchestrateExperiment(broker=self.broker,
 								  experimentId=experimentId,
 								  scenarioFile=SCENARIO_TO_FILE[scenario],
 								  testbed=testbed,
 								  firmwareName=firmwareName,
-								  nodes=nodes)
+								  nodes=nodes) ]
 
 			# respond with success
 			self.mqttClient.publish(
@@ -95,6 +98,18 @@ class OrchestratorV2():
 						'token': token,
 						'success': True,
 						'experimentId': experimentId
+					}
+				),
+			)
+		except KeyError as key:
+			print "Malformed request. Responding with fail."
+			# respond with success
+			self.mqttClient.publish(
+				topic=self.OPENBENCHMARK_STARTBENCHMARK_RESPONSE_TOPIC,
+				payload=json.dumps(
+					{
+						'token': token,
+						'success': False,
 					}
 				),
 			)
@@ -116,6 +131,10 @@ class OrchestrateExperiment(threading.Thread):
 		self.testbed = testbed
 		self.firmwareName = firmwareName
 		self.nodes = nodes
+		self.timeNow = 0
+
+		# sync primitives
+		self.timeLock = threading.Lock()
 
 		# flag to permit exit from read loop
 		self.goOn = True
@@ -144,16 +163,15 @@ class OrchestrateExperiment(threading.Thread):
 		print "numberOfNodes           = {0}".format(self.numberOfNodes)
 		print "payloadSize             = {0}".format(self.payloadSize)
 		print "networkFormationTimeSec = {0}".format(self.networkFormationTimeSec)
-#		print "nodeIdsList             = {0}".format(self.nodeIdsList)
-#		print "trafficInstantList      = {0}".format(self.trafficInstantsListSorted)
 		print "========================================="
 
 		# start myself
 		self.start()
 
 	def close(self):
-
 		self.goOn = False
+		with self.timeLock:
+			self.timeNow = self.totalDurationSec + 1
 	# ======================== thread ==========================================
 
 	def run(self):
@@ -163,9 +181,8 @@ class OrchestrateExperiment(threading.Thread):
 			print("Experiment started. Thread: {0}".format(self.name))
 
 			while self.goOn:  # open serial port
-				timeNow = 0
 
-				while timeNow < self.totalDurationSec:
+				while self.timeNow < self.totalDurationSec:
 					# start orchestration
 					nextInstant = self.nextTrafficInstant(self.nodes)
 
@@ -175,17 +192,20 @@ class OrchestrateExperiment(threading.Thread):
 						# remove the source from the nodes list
 						del self.nodes[source]['traffic_sending_points'][0]
 
-						time.sleep(timeInst - timeNow)
+						time.sleep(timeInst - self.timeNow)
 
-						timeNow = timeInst
+						with self.timeLock:
+							self.timeNow = timeInst
 
 						# TODO send MQTT command
-						print "Sending MQTT command to: {0}@{1}".format(source, timeInst)
+						print "Sending MQTT command to: {0} @ {1}".format(source, timeInst)
 					else:
-						# end of the experiment
-						print "Reached the end of the experiment. Closing."
-						self.close()
+						# end of the experiment, get out of the while timeNow loop
 						break
+
+				print "End of the experiment. Shutting down thread {0}".format(self.name)
+				self.close()
+
 		except Exception as err:
 			traceback.print_exc()
 			sys.exit()
@@ -200,7 +220,6 @@ class OrchestrateExperiment(threading.Thread):
 
 			try:
 				candidate = v['traffic_sending_points'][0]
-				print candidate
 				candidate['source'] = k
 
 				source = k
@@ -225,7 +244,6 @@ class OrchestrateExperiment(threading.Thread):
 					candidatesList.append(
 						(source, destination, timeInst, confirmable, packetsInBurst)
 					)
-
 		try:
 			# sort by time instant
 			nextInstant = min(candidatesList, key = lambda k:k[2])
