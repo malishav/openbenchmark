@@ -56,6 +56,9 @@ class OrchestratorV2():
 
 	def _on_mqtt_message(self, client, userdata, message):
 
+		print "Message received on topic: {0}".format(message.topic)
+		print message.payload
+
 		# assume this is the startBenchmark command
 		assert message.topic == self.OPENBENCHMARK_STARTBENCHMARK_REQUEST_TOPIC
 
@@ -84,7 +87,7 @@ class OrchestratorV2():
 					{
 						'token': token,
 						'success': True,
-						'experimentId': ran
+						'experimentId': experimentId
 					}
 				),
 			)
@@ -95,6 +98,9 @@ class OrchestratorV2():
 class OrchestrateExperiment(threading.Thread):
 
 	def __init__(self, broker, experimentId, scenarioFile, testbed, firmwareName, nodes):
+
+		# initialize the parent class
+		threading.Thread.__init__(self)
 
 		# local vars
 		self.broker = broker
@@ -107,11 +113,33 @@ class OrchestrateExperiment(threading.Thread):
 		# flag to permit exit from read loop
 		self.goOn = True
 
-		# initialize the parent class
-		threading.Thread.__init__(self)
-
 		# give this thread a name
 		self.name = 'Orchestrate@' + self.scenarioFile + '@' + self.experimentId
+
+		with open(self.scenarioFile, 'r') as f:
+			scenario = json.load(f)
+			self.totalDurationSec        = scenario['duration_min'] * 60
+			self.numberOfNodes           = scenario['number_of_nodes']
+			self.payloadSize             = scenario['payload_size']
+			self.networkFormationTimeSec = scenario['nf_time_padding_min'] * 60
+			self.nodes                   = scenario['nodes']
+
+		print "========================================="
+		print "Thread {0} starting".format(self.name)
+		print "broker                  = {0}".format(self.broker)
+		print "experimentId            = {0}".format(self.experimentId)
+		print "testbed                 = {0}".format(self.testbed)
+		print "firmwareName            = {0}".format(self.firmwareName)
+		print "nodes                   = {0}".format(self.nodes)
+		print "========================================="
+		print "Scenario                = {0}".format(self.scenarioFile)
+		print "totalDurationSec        = {0}".format(self.totalDurationSec)
+		print "numberOfNodes           = {0}".format(self.numberOfNodes)
+		print "payloadSize             = {0}".format(self.payloadSize)
+		print "networkFormationTimeSec = {0}".format(self.networkFormationTimeSec)
+#		print "nodeIdsList             = {0}".format(self.nodeIdsList)
+#		print "trafficInstantList      = {0}".format(self.trafficInstantsListSorted)
+		print "========================================="
 
 		# start myself
 		self.start()
@@ -128,12 +156,76 @@ class OrchestrateExperiment(threading.Thread):
 			print("Experiment started. Thread: {0}".format(self.name))
 
 			while self.goOn:  # open serial port
-				time.sleep(5)
-				pass
-				# start orchestration
+				timeNow = 0
+
+				while timeNow < self.totalDurationSec:
+					# start orchestration
+					nextInstant = self.nextTrafficInstant(self.nodes)
+
+					if nextInstant:
+						(source, destination, timeInst, confirmable, packetsInBurst) = nextInstant
+
+						# remove the source from the nodes list
+						del self.nodes[source]['traffic_sending_points'][0]
+
+						time.sleep(timeInst - timeNow)
+
+						timeNow = timeInst
+
+						# TODO send MQTT command
+						print "Sending MQTT command to: {0}@{1}".format(source, timeInst)
+					else:
+						# end of the experiment
+						print "Reached the end of the experiment. Closing."
+						self.close()
+						break
 		except Exception as err:
 			traceback.print_exc()
 			sys.exit()
+
+	''' Returns a tuple
+	(source, destination, time, confirmable, packetsInBurst)
+	'''
+	def nextTrafficInstant(self, nodes):
+		# first element in the sorted traffic_sending_points list of each node
+		candidatesList = []
+		for k,v in nodes.iteritems():
+
+			try:
+				candidate = v['traffic_sending_points'][0]
+				print candidate
+				candidate['source'] = k
+
+				source = k
+				destination = candidate['destination']
+				timeInst = candidate['time_sec']
+				confirmable = candidate['confirmable']
+				packetsInBurst = candidate.get('packets_in_burst', 1)
+
+			except IndexError:
+				source = None
+				destination = None
+				timeInst = None
+				confirmable = None
+				packetsInBurst = None
+			except:
+				traceback.print_exc()
+				self.close()
+				sys.exit()
+			else:
+				if source is not None:
+					# convert to tuple for easier manip
+					candidatesList.append(
+						(source, destination, timeInst, confirmable, packetsInBurst)
+					)
+
+		try:
+			# sort by time instant
+			nextInstant = min(candidatesList, key = lambda k:k[2])
+		except:
+			nextInstant = None
+
+		return nextInstant
 
 class OpenBenchmark:
 
