@@ -130,7 +130,7 @@ class OrchestrateExperiment(threading.Thread):
 		self.experimentId = experimentId
 		self.testbed = testbed
 		self.scenarioConfigFile = os.path.join(scenarioDir, SCENARIO_CONFIG_FILENAME)
-		self.scenarioTestbedFile = os.path.join(scenarioDir, '_' + self.testbed + SCENARIO_CONFIG_FILENAME)
+		self.scenarioTestbedFile = os.path.join(scenarioDir, '_{0}{1}'.format(self.testbed, SCENARIO_CONFIG_FILENAME))
 		self.firmwareName = firmwareName
 		self.requestNodes = nodes
 		self.timeNow = 0
@@ -153,18 +153,22 @@ class OrchestrateExperiment(threading.Thread):
 			self.networkFormationTimeSec = scenario['nf_time_padding_min'] * 60
 			self.scenarioNodes           = scenario['nodes']
 
-		with open(self.scenarioTestbedFile, 'r') as f:
-
-			scenarioTestbed = json.loads(f)
+		with open(self.scenarioTestbedFile, 'r') as testbedFile:
+			scenarioTestbed = json.load(testbedFile)
 
 			# merge testbed specific dict of nodes with the generic one
 			for k,v in scenarioTestbed.iteritems():
 				self.scenarioNodes[k].update(v)
 
-		# sanity checks
+		# sanity check
 		assert len(self.scenarioNodes) == len(self.requestNodes), "Inconsistent number of nodes. " \
                                                                   "Scenario file and the request received " \
                                                                   "from the SUT do not match up."
+
+		# map eui-64 received in the request with the generic identifier
+		for genericId in self.scenarioNodes.keys():
+			self.scenarioNodes[genericId]['eui64'] = self.requestNodes[self.scenarioNodes[genericId]['node_id']]
+			print "Mapping generic scenario node {0} to {1}.".format(genericId, self.scenarioNodes[genericId]['eui64'])
 
 		print "========================================="
 		print "Thread {0} starting".format(self.name)
@@ -172,7 +176,7 @@ class OrchestrateExperiment(threading.Thread):
 		print "experimentId            = {0}".format(self.experimentId)
 		print "testbed                 = {0}".format(self.testbed)
 		print "firmwareName            = {0}".format(self.firmwareName)
-		print "nodes                   = {0}".format(self.scenarioNodes)
+		print "requestNodes            = {0}".format(self.requestNodes)
 		print "========================================="
 		print "Scenario                = {0}".format(self.scenarioConfigFile)
 		print "totalDurationSec        = {0}".format(self.totalDurationSec)
@@ -213,6 +217,7 @@ class OrchestrateExperiment(threading.Thread):
 				self.triggerNetworkFormation()
 
 				# once network formation is triggered, sleep for N mins allowing the network to form
+				print "Going to sleep for {0} minutes".format(self.networkFormationTimeSec/60.0)
 				time.sleep(self.networkFormationTimeSec)
 
 				while self.timeNow < self.totalDurationSec:
@@ -251,9 +256,11 @@ class OrchestrateExperiment(threading.Thread):
 			self.timeNow = self.totalDurationSec + 1
 
 	def configureTransmitPower(self):
+		# TODO
 		pass
 
 	def triggerNetworkFormation(self):
+		# TODO
 		pass
 
 	''' Returns a tuple
