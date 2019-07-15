@@ -68,8 +68,10 @@ class OrchestratorV1():
 
 	def _on_mqtt_message(self, client, userdata, message):
 
+		print "------------------------------------------"
 		print "Message received on topic: {0}".format(message.topic)
 		print message.payload
+		print "------------------------------------------"
 
 		# assume this is the startBenchmark command
 		assert message.topic == self.OPENBENCHMARK_STARTBENCHMARK_REQUEST_TOPIC
@@ -144,6 +146,8 @@ class OrchestrateExperiment(threading.Thread):
 		# give this thread a name
 		self.name = 'Orchestrate@' + self.scenarioConfigFile + '@' + self.experimentId
 
+		print "Initializing thread: {0}.".format(self.name)
+
 		with open(self.scenarioConfigFile, 'r') as f:
 
 			scenario = json.load(f)
@@ -168,16 +172,15 @@ class OrchestrateExperiment(threading.Thread):
 		# map eui-64 received in the request with the generic identifier
 		for genericId in self.scenarioNodes.keys():
 			self.scenarioNodes[genericId]['eui64'] = self.requestNodes[self.scenarioNodes[genericId]['node_id']]
-			print "Mapping generic scenario node {0} to {1}.".format(genericId, self.scenarioNodes[genericId]['eui64'])
+			print "Mapping {0} -> {1}.".format(genericId, self.scenarioNodes[genericId]['eui64'])
 
 		print "========================================="
-		print "Thread {0} starting".format(self.name)
 		print "broker                  = {0}".format(self.broker)
 		print "experimentId            = {0}".format(self.experimentId)
 		print "testbed                 = {0}".format(self.testbed)
 		print "firmwareName            = {0}".format(self.firmwareName)
 		print "requestNodes            = {0}".format(self.requestNodes)
-		print "========================================="
+		print "-----------------------------------------"
 		print "Scenario                = {0}".format(self.scenarioConfigFile)
 		print "totalDurationSec        = {0}".format(self.totalDurationSec)
 		print "numberOfNodes           = {0}".format(self.numberOfNodes)
@@ -282,6 +285,7 @@ class OrchestrateExperiment(threading.Thread):
 				packetsInBurst = candidate.get('packets_in_burst', 1)
 
 			except IndexError:
+				# meaning we are out of events to send for this node
 				source = None
 				destination = None
 				timeInst = None
