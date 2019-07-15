@@ -20,7 +20,7 @@ SCENARIO_TO_DIR = {
 
 SCENARIO_CONFIG_FILENAME = '_config.json'
 
-class OrchestratorV2():
+class OrchestratorV1():
 
 	# MQTT topics
 	OPENBENCHMARK_STARTBENCHMARK_REQUEST_TOPIC = 'openbenchmark/command/startBenchmark'
@@ -332,7 +332,7 @@ class OpenBenchmark:
 		)
 		parser.add_argument('--action', 
 			dest       = 'action',
-			choices    = ['check', 'reserve', 'terminate', 'flash', 'sut-start', 'ov', 'orchestrator', 'orchestratorV2'],
+			choices    = ['check', 'reserve', 'terminate', 'flash', 'sut-start', 'ov', 'orchestrator', 'orchestratorV1'],
 			required   = True,
 			action     = 'store'
 		)
@@ -405,9 +405,8 @@ def main():
 	branch    = args['branch']
 
 
-	if action == 'orchestratorV2':
-		print "starting orchestratorV2"
-		OrchestratorV2(broker=broker)
+	if action == 'orchestratorV1':
+		OrchestratorV1(broker=broker)
 	else:
 		ExpProvisioner(user_id, simulator, action, testbed, scenario, firmware, branch)
 
