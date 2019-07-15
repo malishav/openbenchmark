@@ -11,12 +11,14 @@ import signal
 
 from experiment_provisioner.main import Main as ExpProvisioner
 
-SCENARIO_TO_FILE = {
-	'demo-scenario' 		: os.path.join(os.path.dirname(__file__), "scenario-config", 'demo-scenario', '_config.json'),
-	'building-automation' 	: os.path.join(os.path.dirname(__file__), "scenario-config", 'building-automation', '_config.json'),
-	'home-automation' 		: os.path.join(os.path.dirname(__file__), "scenario-config", 'home-automation', '_config.json'),
-	'industrial-monitoring' : os.path.join(os.path.dirname(__file__), "scenario-config", 'industrial-monitoring', '_config.json')
+SCENARIO_TO_DIR = {
+	'demo-scenario' 		: os.path.join(os.path.dirname(__file__), "scenario-config", 'demo-scenario'),
+	'building-automation' 	: os.path.join(os.path.dirname(__file__), "scenario-config", 'building-automation'),
+	'home-automation' 		: os.path.join(os.path.dirname(__file__), "scenario-config", 'home-automation'),
+	'industrial-monitoring' : os.path.join(os.path.dirname(__file__), "scenario-config", 'industrial-monitoring')
 }
+
+SCENARIO_CONFIG_FILENAME = '_config.json'
 
 class OrchestratorV2():
 
@@ -81,14 +83,14 @@ class OrchestratorV2():
 			nodes 			= payload['nodes']
 			scenario 		= payload['scenario']
 
-			experimentId = ''.join(random.choice(string.ascii_lowercase) for i in range(10))
+			experimentId = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
 
 			self.threads += [ OrchestrateExperiment(broker=self.broker,
-								  experimentId=experimentId,
-								  scenarioFile=SCENARIO_TO_FILE[scenario],
-								  testbed=testbed,
-								  firmwareName=firmwareName,
-								  nodes=nodes) ]
+													experimentId=experimentId,
+													scenarioDir=SCENARIO_TO_DIR[scenario],
+													testbed=testbed,
+													firmwareName=firmwareName,
+													nodes=nodes) ]
 
 			# respond with success
 			self.mqttClient.publish(
@@ -101,9 +103,11 @@ class OrchestratorV2():
 					}
 				),
 			)
-		except KeyError as key:
-			print "Malformed request. Responding with fail."
-			# respond with success
+
+		except Exception as e:
+			print "Malformed request or internal error. Responding with fail."
+			traceback.print_exc()
+			# respond with fail
 			self.mqttClient.publish(
 				topic=self.OPENBENCHMARK_STARTBENCHMARK_RESPONSE_TOPIC,
 				payload=json.dumps(
@@ -113,13 +117,10 @@ class OrchestratorV2():
 					}
 				),
 			)
-		except Exception as e:
-			traceback.print_exc()
-			self.close()
 
 class OrchestrateExperiment(threading.Thread):
 
-	def __init__(self, broker, experimentId, scenarioFile, testbed, firmwareName, nodes):
+	def __init__(self, broker, experimentId, scenarioDir, testbed, firmwareName, nodes):
 
 		# initialize the parent class
 		threading.Thread.__init__(self)
@@ -127,10 +128,11 @@ class OrchestrateExperiment(threading.Thread):
 		# local vars
 		self.broker = broker
 		self.experimentId = experimentId
-		self.scenarioFile = scenarioFile
 		self.testbed = testbed
+		self.scenarioConfigFile = os.path.join(scenarioDir, SCENARIO_CONFIG_FILENAME)
+		self.scenarioTestbedFile = os.path.join(scenarioDir, '_' + self.testbed + SCENARIO_CONFIG_FILENAME)
 		self.firmwareName = firmwareName
-		self.nodes = nodes
+		self.requestNodes = nodes
 		self.timeNow = 0
 
 		# sync primitives
@@ -140,15 +142,29 @@ class OrchestrateExperiment(threading.Thread):
 		self.goOn = True
 
 		# give this thread a name
-		self.name = 'Orchestrate@' + self.scenarioFile + '@' + self.experimentId
+		self.name = 'Orchestrate@' + self.scenarioConfigFile + '@' + self.experimentId
 
-		with open(self.scenarioFile, 'r') as f:
+		with open(self.scenarioConfigFile, 'r') as f:
+
 			scenario = json.load(f)
 			self.totalDurationSec        = scenario['duration_min'] * 60
 			self.numberOfNodes           = scenario['number_of_nodes']
 			self.payloadSize             = scenario['payload_size']
 			self.networkFormationTimeSec = scenario['nf_time_padding_min'] * 60
-			self.nodes                   = scenario['nodes']
+			self.scenarioNodes           = scenario['nodes']
+
+		with open(self.scenarioTestbedFile, 'r') as f:
+
+			scenarioTestbed = json.loads(f)
+
+			# merge testbed specific dict of nodes with the generic one
+			for k,v in scenarioTestbed.iteritems():
+				self.scenarioNodes[k].update(v)
+
+		# sanity checks
+		assert len(self.scenarioNodes) == len(self.requestNodes), "Inconsistent number of nodes. " \
+                                                                  "Scenario file and the request received " \
+                                                                  "from the SUT do not match up."
 
 		print "========================================="
 		print "Thread {0} starting".format(self.name)
@@ -156,22 +172,30 @@ class OrchestrateExperiment(threading.Thread):
 		print "experimentId            = {0}".format(self.experimentId)
 		print "testbed                 = {0}".format(self.testbed)
 		print "firmwareName            = {0}".format(self.firmwareName)
-		print "nodes                   = {0}".format(self.nodes)
+		print "nodes                   = {0}".format(self.scenarioNodes)
 		print "========================================="
-		print "Scenario                = {0}".format(self.scenarioFile)
+		print "Scenario                = {0}".format(self.scenarioConfigFile)
 		print "totalDurationSec        = {0}".format(self.totalDurationSec)
 		print "numberOfNodes           = {0}".format(self.numberOfNodes)
 		print "payloadSize             = {0}".format(self.payloadSize)
 		print "networkFormationTimeSec = {0}".format(self.networkFormationTimeSec)
 		print "========================================="
 
+		try:
+			# mqtt client
+			self.mqttClient = mqtt.Client(self.name)
+			self.mqttClient.on_connect = self._on_mqtt_connect
+			self.mqttClient.on_message = self._on_mqtt_message
+			self.mqttClient.connect(self.broker)
+			self.mqttClient.loop_start()
+
+		except Exception as e:
+			traceback.print_exc()
+			self.close()
+
 		# start myself
 		self.start()
 
-	def close(self):
-		self.goOn = False
-		with self.timeLock:
-			self.timeNow = self.totalDurationSec + 1
 	# ======================== thread ==========================================
 
 	def run(self):
@@ -182,15 +206,24 @@ class OrchestrateExperiment(threading.Thread):
 
 			while self.goOn:  # open serial port
 
+				# set tx power of each node to the one in the scenario file
+				self.configureTransmitPower()
+
+				# now is the time to trigger network formation
+				self.triggerNetworkFormation()
+
+				# once network formation is triggered, sleep for N mins allowing the network to form
+				time.sleep(self.networkFormationTimeSec)
+
 				while self.timeNow < self.totalDurationSec:
 					# start orchestration
-					nextInstant = self.nextTrafficInstant(self.nodes)
+					nextInstant = self.nextTrafficInstant(self.scenarioNodes)
 
 					if nextInstant:
 						(source, destination, timeInst, confirmable, packetsInBurst) = nextInstant
 
 						# remove the source from the nodes list
-						del self.nodes[source]['traffic_sending_points'][0]
+						del self.scenarioNodes[source]['traffic_sending_points'][0]
 
 						time.sleep(timeInst - self.timeNow)
 
@@ -209,6 +242,19 @@ class OrchestrateExperiment(threading.Thread):
 		except Exception as err:
 			traceback.print_exc()
 			sys.exit()
+
+	# ======================== public ==========================================
+
+	def close(self):
+		self.goOn = False
+		with self.timeLock:
+			self.timeNow = self.totalDurationSec + 1
+
+	def configureTransmitPower(self):
+		pass
+
+	def triggerNetworkFormation(self):
+		pass
 
 	''' Returns a tuple
 	(source, destination, time, confirmable, packetsInBurst)
@@ -251,6 +297,14 @@ class OrchestrateExperiment(threading.Thread):
 			nextInstant = None
 
 		return nextInstant
+
+	# ======================== private ==========================================
+
+	def _on_mqtt_connect(self, client, userdata, flags, rc):
+		pass
+
+	def _on_mqtt_message(self, client, userdata, message):
+		pass
 
 class OpenBenchmark:
 
