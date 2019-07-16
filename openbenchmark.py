@@ -122,6 +122,8 @@ class OrchestratorV1():
 
 class OrchestrateExperiment(threading.Thread):
 
+	ORCHESTRATE_MAX_FAILURE_COUNTER = 5
+
 	def __init__(self, broker, experimentId, scenarioDir, testbed, firmwareName, nodes):
 
 		# initialize the parent class
@@ -136,6 +138,7 @@ class OrchestrateExperiment(threading.Thread):
 		self.firmwareName = firmwareName
 		self.requestNodes = nodes
 		self.timeNow = 0
+		self.failureCounter = 0
 
 		# sync primitives
 		self.timeLock = threading.Lock()
@@ -214,10 +217,14 @@ class OrchestrateExperiment(threading.Thread):
 			while self.goOn:  # open serial port
 
 				# set tx power of each node to the one in the scenario file
-				self.configureTransmitPower()
+				for genericId in self.scenarioNodes.keys():
+					self.configureTransmitPower(source=self.scenarioNodes[genericId]['eui64'],
+												power=self.scenarioNodes[genericId]['transmission_power_dbm'])
+					# give SUT some time to react
+					time.sleep(1)
 
 				# now is the time to trigger network formation
-				self.triggerNetworkFormation()
+				self.triggerNetworkFormation(source=self.scenarioNodes['openbenchmark00']['eui64'])
 
 				# once network formation is triggered, sleep for N mins allowing the network to form
 				print "Going to sleep for {0} minutes".format(self.networkFormationTimeSec/60.0)
@@ -238,8 +245,12 @@ class OrchestrateExperiment(threading.Thread):
 						with self.timeLock:
 							self.timeNow = timeInst
 
-						# TODO send MQTT command
 						print "Sending MQTT command to: {0} @ {1}".format(source, timeInst)
+						self.triggerSendPacket(source=self.scenarioNodes[source]['eui64'],
+											   destination=self.scenarioNodes[destination]['eui64'],
+											   confirmable=confirmable,
+											   packetsInBurst=packetsInBurst,
+											   payloadSize=self.payloadSize)
 					else:
 						# end of the experiment, get out of the while timeNow loop
 						break
@@ -249,7 +260,7 @@ class OrchestrateExperiment(threading.Thread):
 
 		except Exception as err:
 			traceback.print_exc()
-			sys.exit()
+			self.close()
 
 	# ======================== public ==========================================
 
@@ -258,13 +269,54 @@ class OrchestrateExperiment(threading.Thread):
 		with self.timeLock:
 			self.timeNow = self.totalDurationSec + 1
 
-	def configureTransmitPower(self):
-		# TODO
-		pass
+	def configureTransmitPower(self, source, power):
 
-	def triggerNetworkFormation(self):
-		# TODO
-		pass
+		token = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
+
+		self.mqttClient.publish(
+			topic="openbenchmark/experimentId/{0}/command/configureTransmitPower".format(self.experimentId),
+			payload=json.dumps(
+				{
+					'token' : token,
+					'source': source,
+					'power' : int(power),
+				}
+			),
+		)
+
+	def triggerNetworkFormation(self, source):
+
+		token = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
+
+		self.mqttClient.publish(
+			topic="openbenchmark/experimentId/{0}/command/triggerNetworkFormation".format(self.experimentId),
+			payload=json.dumps(
+				{
+					'token' : token,
+					'source': source,
+				}
+			),
+		)
+
+	def triggerSendPacket(self, source, destination, confirmable, packetsInBurst, payloadSize):
+
+		token = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
+		packetToken = [0, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
+
+		self.mqttClient.publish(
+			topic="openbenchmark/experimentId/{0}/command/sendPacket".format(self.experimentId),
+			payload=json.dumps(
+				{
+					'token'            : token,
+					'source'           : source,
+					'destination'      : destination,
+					'packetsInBurst'   : int(packetsInBurst),
+					'packetToken'      : packetToken,
+					'packetPayloadLen' : int(payloadSize),
+					'confirmable'      : bool(confirmable),
+				}
+			),
+		)
 
 	''' Returns a tuple
 	(source, destination, time, confirmable, packetsInBurst)
@@ -312,10 +364,61 @@ class OrchestrateExperiment(threading.Thread):
 	# ======================== private ==========================================
 
 	def _on_mqtt_connect(self, client, userdata, flags, rc):
-		pass
+		if rc != 0:
+			print "Unsuccesful MQTT connection. Return code: {0}".format(rc)
+			self.close()
+
+		# subscribe to the handled topics
+		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/command/echo")
+		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/response/sendPacket")
+		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/response/configureTransmitPower")
+		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/response/triggerNetworkFormation")
 
 	def _on_mqtt_message(self, client, userdata, message):
-		pass
+		if message.topic == "openbenchmark/experimentId/{0}/command/echo".format(self.experimentId):
+
+			try:
+
+				payload = message.payload.decode('utf8')
+				assert payload, "Could not decode payload"
+
+				tokenReceived = json.loads(payload)['token']
+
+				# respond with success
+				client.publish(
+					topic="openbenchmark/experimentId/{0}/response/echo",
+					payload=json.dumps(
+						{
+							'token': tokenReceived,
+							'success': True,
+						}
+					),
+				)
+			except:
+				traceback.print_exc()
+
+		# this is a response to some of the messages sent, basic processing to verify if it's a success
+		else:
+			try:
+				m = re.search("openbenchmark/experimentId/{0}/response/([a-zA-Z]+)".format(self.experimentId), message.topic)
+				assert m, "Invalid topic, could not parse: '{0}'".format(topic)
+
+				subTopic = m.group(1)
+
+				print("Received response {0}".format(subTopic))
+
+				payload = message.payload.decode('utf8')
+				assert payload, "Could not decode payload"
+
+				tokenReceived = json.loads(payload)['token']
+				success = json.loads(payload)['success']
+
+				assert success, "Failure indicated by the SUT"
+			except:
+				self.failureCounter += 1
+				if self.failureCounter >= self.ORCHESTRATE_MAX_FAILURE_COUNTER:
+					print("Too many failures, shutting down.")
+					self.close()
 
 class OpenBenchmark:
 
