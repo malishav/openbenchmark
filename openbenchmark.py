@@ -175,7 +175,9 @@ class OrchestrateExperiment(threading.Thread):
 		# map eui-64 received in the request with the generic identifier
 		for genericId in self.scenarioNodes.keys():
 			self.scenarioNodes[genericId]['eui64'] = self.requestNodes[self.scenarioNodes[genericId]['node_id']]
-			print "Mapping {0} -> {1}.".format(genericId, self.scenarioNodes[genericId]['eui64'])
+			print "Mapping {0} -> {1} -> {2}.".format(genericId,
+													  self.scenarioNodes[genericId]['node_id'],
+													  self.scenarioNodes[genericId]['eui64'])
 
 		print "========================================="
 		print "broker                  = {0}".format(self.broker)
