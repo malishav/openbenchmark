@@ -4,6 +4,7 @@ import json
 import random
 import string
 import os
+import re
 import threading
 import time
 import traceback
@@ -438,6 +439,7 @@ class OrchestrateExperiment(threading.Thread):
 				assert success, "Failure indicated by the SUT"
 			except:
 				self.failureCounter += 1
+				traceback.print_exc()
 				if self.failureCounter >= self.ORCHESTRATE_MAX_FAILURE_COUNTER:
 					print("Too many failures, shutting down.")
 					self.close()
