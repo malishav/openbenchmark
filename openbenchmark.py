@@ -9,6 +9,7 @@ import threading
 import time
 import traceback
 import signal
+import Queue
 
 from experiment_provisioner.main import Main as ExpProvisioner
 
@@ -51,21 +52,22 @@ class OrchestratorV1():
 			self.close()
 
 		while self.goOn:
+			# keep the main thread alive
 			time.sleep(5)
-			pass
 
 	def close(self):
 		self.goOn = False
 		if self.mqttClient:
 			self.mqttClient.loop_stop()
-		for thread in self.threads:
-			thread.close()
+		for (thread1, thread2) in self.threads:
+			thread1.close()
+			thread2.close()
 
 	def _on_mqtt_connect(self, client, userdata, flags, rc):
 		self.mqttClient.subscribe(self.OPENBENCHMARK_STARTBENCHMARK_REQUEST_TOPIC)
 
 	def _signal_handler(self, sig, frame):
-		print "Shutting down the deamon."
+		print "Shutting down the main process."
 		self.close()
 
 	def _on_mqtt_message(self, client, userdata, message):
@@ -93,12 +95,25 @@ class OrchestratorV1():
 
 			experimentId = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
 
-			self.threads += [ OrchestrateExperiment(broker=self.broker,
-													experimentId=experimentId,
-													scenarioDir=SCENARIO_TO_DIR[scenario],
-													testbed=testbed,
-													firmwareName=firmwareName,
-													nodes=nodes) ]
+			performanceEventThread = PerformanceEventHandler(broker=self.broker,
+															 experimentId=experimentId,
+															 scenario=scenario,
+															 testbed=testbed,
+															 firmware=firmwareName,
+															 date=date,
+															 nodes=nodes)
+
+			orchestrateThread = OrchestrateExperiment(broker=self.broker,
+													   experimentId=experimentId,
+													   performanceEventHandler=performanceEventThread,
+													   scenarioDir=SCENARIO_TO_DIR[scenario],
+													   testbed=testbed,
+													   firmwareName=firmwareName,
+													   nodes=nodes)
+
+
+
+			self.threads += [ (orchestrateThread, performanceEventThread) ]
 
 			# respond with success
 			self.mqttClient.publish(
@@ -126,11 +141,107 @@ class OrchestratorV1():
 				),
 			)
 
+class PerformanceEventHandler(threading.Thread):
+
+	LOG_DIRNAME = os.path.join(os.path.dirname(__file__), "logs")
+
+	def __init__(self, broker, experimentId, scenario, testbed, firmware, date, nodes):
+
+		# initialize the parent class
+		threading.Thread.__init__(self)
+
+		# store vars
+		self.broker = broker
+		self.experimentId = experimentId
+		self.scenario = scenario
+		self.testbed = testbed
+		self.firmware = firmware
+		self.date = date
+		self.nodes = nodes
+
+		# flag to permit exit from infinite loop
+		self.goOn = True
+
+		# MQTT message queue
+		self.messageQueue = Queue.Queue(maxsize=50)
+
+		# give this thread a name
+		self.name = 'PerformanceEventHandler@' + self.testbed + '@' + self.experimentId
+
+		try:
+			# mqtt client
+			self.mqttClient = mqtt.Client(self.name)
+			self.mqttClient.on_connect = self._on_mqtt_connect
+			self.mqttClient.on_message = self._on_mqtt_message
+			self.mqttClient.connect(self.broker)
+			self.mqttClient.loop_start()
+
+		except Exception as e:
+			traceback.print_exc()
+			self.close()
+
+		if not os.path.exists(self.LOG_DIRNAME):
+			os.makedirs(self.LOG_DIRNAME)
+
+		self.logFile = "{0}_{1}_{2}_{3}.log".format(self.scenario, self.testbed, self.firmware, self.experimentId)
+		self.logfile = os.path.join(self.LOG_DIRNAME, self.logFile)
+
+		headerLine = {
+			'date' : self.date,
+			'experimentId'  : self.experimentId,
+			'testbed'		: self.testbed,
+			'firmware'      : self.firmware,
+			'nodes'			: self.nodes,
+			'scenario'		: scenario
+		}
+
+		with open(self.logFile, "w") as f:
+			json.dump(headerLine, f)
+			f.write('\n')
+
+		# start myself
+		self.start()
+
+	# ======================== thread ==========================================
+
+	def run(self):
+		while self.goOn:
+			# blocking call
+			payload = self.messageQueue.get(block=True)
+			# TODO implement KPI calculation here
+			print payload
+			with open(self.logFile, "a") as f:
+				json.dump(payload, f)
+				f.write('\n')
+
+	def close(self):
+		self.goOn = False
+
+	def append_line(self, line):
+		with open(self.logFile, "a") as f:
+			f.write(line + '\n')
+
+	def _on_mqtt_connect(self, client, userdata, flags, rc):
+		# subscribe to the handled topics
+		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/nodeId/+/performanceData".format(self.experimentId))
+
+	def _on_mqtt_message(self, client, userdata, message):
+		try:
+			payload = message.payload.decode('utf8')
+			payload = json.loads(payload)
+
+			try:
+				self.messageQueue.put(payload, block=False)
+			except:
+				print "queue overflow"
+		except:
+			print "Could not decode payload"
+
 class OrchestrateExperiment(threading.Thread):
 
 	ORCHESTRATE_MAX_FAILURE_COUNTER = 5
 
-	def __init__(self, broker, experimentId, scenarioDir, testbed, firmwareName, nodes):
+	def __init__(self, broker, experimentId, performanceEventHandler, scenarioDir, testbed, firmwareName, nodes):
 
 		# initialize the parent class
 		threading.Thread.__init__(self)
@@ -138,6 +249,7 @@ class OrchestrateExperiment(threading.Thread):
 		# local vars
 		self.broker = broker
 		self.experimentId = experimentId
+		self.performanceEventHandler = performanceEventHandler
 		self.testbed = testbed
 		self.scenarioConfigFile = os.path.join(scenarioDir, SCENARIO_CONFIG_FILENAME)
 		self.scenarioTestbedFile = os.path.join(scenarioDir, '_{0}{1}'.format(self.testbed, SCENARIO_CONFIG_FILENAME))
@@ -268,7 +380,10 @@ class OrchestrateExperiment(threading.Thread):
 						with self.timeLock:
 							self.timeNow = timeInst
 
-						print "Sending MQTT command to: {0} @ {1}".format(source, timeInst)
+						logLine = "Sending MQTT command: time={0}, source={1}, destination={2}, confirmable={3}, packetsInBurst={4} ".format(timeInst, source, destination, confirmable, packetsInBurst)
+						print logLine
+						self.performanceEventHandler.append_line(logLine)
+
 						self.triggerSendPacket(source=self.scenarioNodes[source]['eui64'],
 											   destination=self.scenarioNodes[destination]['eui64'],
 											   confirmable=confirmable,
