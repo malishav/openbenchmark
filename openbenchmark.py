@@ -391,10 +391,10 @@ class OrchestrateExperiment(threading.Thread):
 			self.close()
 
 		# subscribe to the handled topics
-		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/command/echo")
-		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/response/sendPacket")
-		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/response/configureTransmitPower")
-		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/response/triggerNetworkFormation")
+		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/command/echo".format(self.experimentId))
+		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/response/sendPacket".format(self.experimentId))
+		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/response/configureTransmitPower".format(self.experimentId))
+		self.mqttClient.subscribe("openbenchmark/experimentId/{0}/response/triggerNetworkFormation".format(self.experimentId))
 
 	def _on_mqtt_message(self, client, userdata, message):
 		if message.topic == "openbenchmark/experimentId/{0}/command/echo".format(self.experimentId):
