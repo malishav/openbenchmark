@@ -172,12 +172,27 @@ class OrchestrateExperiment(threading.Thread):
                                                                   "Scenario file and the request received " \
                                                                   "from the SUT do not match up."
 
+		# if the request arrives with more than one eui64 address attached to a given host name, append suffix to it
+		# suffixed host matches the testbed-specific scenario file
+		suffixedHosts = {}
+		for host, v in self.requestNodes.iteritems():
+			if len(v) > 1:
+				for index, eui64 in enumerate(v):
+					suffixedHosts["{0}-{1}".format(host, index)] = eui64
+			else:
+				suffixedHosts[host] = v[0]
+
 		# map eui-64 received in the request with the generic identifier
 		for genericId in self.scenarioNodes.keys():
-			self.scenarioNodes[genericId]['eui64'] = self.requestNodes[self.scenarioNodes[genericId]['node_id']]
+			expectedTestbedHost = self.scenarioNodes[genericId]['node_id']
+			self.scenarioNodes[genericId]['eui64'] = suffixedHosts[expectedTestbedHost]
 			print "Mapping {0} -> {1} -> {2}.".format(genericId,
-													  self.scenarioNodes[genericId]['node_id'],
+													  expectedTestbedHost,
 													  self.scenarioNodes[genericId]['eui64'])
+
+		for genericId in self.scenarioNodes.keys():
+			# verify that all nodes have been mapped
+			assert self.scenarioNodes[genericId]['eui64']
 
 		print "========================================="
 		print "broker                  = {0}".format(self.broker)
