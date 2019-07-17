@@ -429,15 +429,15 @@ MQTT topic:
 
 Payload of the request MUST be a JSON object with following fields:
 
-Field name   | Description                                   | JSON Type
------------- | --------------------------------------------- | -------
-api_version  | Set to implemented API version                | string
-token        | Random token used to match the response       | string
-date         | RFC2822 time when experiment is launched      | string
-firmware     | [IUT identifier](#supported-iuts), with a custom suffix | string
-testbed      | [Testbed identifier](#supported-testbeds)     | string
-nodes        | Map of testbed hosts and nodes' EUI64 address | object
-scenario     | Identifier of the scenario requested          | string
+Field name   | Description                                                | JSON Type
+------------ | ---------------------------------------------------------- | -------
+api_version  | Set to implemented API version                             | string
+token        | Random token used to match the response                    | string
+date         | RFC2822 time when experiment is launched                   | string
+firmware     | [IUT identifier](#supported-iuts), with a custom suffix    | string
+testbed      | [Testbed identifier](#supported-testbeds)                  | string
+nodes        | Testbed hosts mapped to a list of attached EUI64 addresses | object
+scenario     | Identifier of the scenario requested                       | string
 
 ```
 Example:
@@ -448,9 +448,9 @@ Example:
         "firmware"     : "OpenWSN-42a4007db7",
         "testbed"      : "wilab"
         "nodes"        : {
-                            "nuc0-35": "00-12-4b-00-14-b5-b6-44",
-                            "nuc0-36": "00-12-4b-00-14-b5-b6-45",
-                            "nuc0-37": "00-12-4b-00-14-b5-b6-46"
+                            "nuc0-35": ["00-12-4b-00-14-b5-b6-44"],
+                            "nuc0-36": ["00-12-4b-00-14-b5-b6-45"],
+                            "nuc0-37": ["00-12-4b-00-14-b5-b6-46", "00-12-4b-00-14-b5-b6-47"]
                          }
         "scenario"     : "building-automation"
     }
