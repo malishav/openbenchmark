@@ -23,6 +23,7 @@ SCENARIO_CONFIG_FILENAME = '_config.json'
 class OrchestratorV1():
 
 	# MQTT topics
+	OPENBENCHMARK_API_VERSION = "1.0.0"
 	OPENBENCHMARK_STARTBENCHMARK_REQUEST_TOPIC = 'openbenchmark/command/startBenchmark'
 	OPENBENCHMARK_STARTBENCHMARK_RESPONSE_TOPIC = 'openbenchmark/response/startBenchmark'
 
@@ -78,6 +79,10 @@ class OrchestratorV1():
 
 		try:
 			payload 		= json.loads(message.payload)
+
+			api_version     = payload['api_version']
+			assert api_version  == self.OPENBENCHMARK_API_VERSION
+
 			token 			= payload['token']
 			date 			= payload['date']
 			firmwareName 	= payload['firmware']
