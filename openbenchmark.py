@@ -11,9 +11,6 @@ import traceback
 import signal
 import Queue
 
-import logging
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
-
 from experiment_provisioner.main import Main as ExpProvisioner
 
 SCENARIO_TO_DIR = {
@@ -40,7 +37,7 @@ class OrchestratorV1():
 
 		signal.signal(signal.SIGINT, self._signal_handler)
 
-		logging.info("Broker: {0}".format(broker))
+		print "Broker: {0}".format(broker)
 
 		try:
 			# mqtt client
@@ -51,7 +48,7 @@ class OrchestratorV1():
 			self.mqttClient.loop_start()
 
 		except Exception as e:
-			logging.exception()
+			traceback.print_exc()
 			self.close()
 
 		while self.goOn:
@@ -70,15 +67,15 @@ class OrchestratorV1():
 		self.mqttClient.subscribe(self.OPENBENCHMARK_STARTBENCHMARK_REQUEST_TOPIC)
 
 	def _signal_handler(self, sig, frame):
-		logging.info("Shutting down the main process.")
+		print "Shutting down the main process."
 		self.close()
 
 	def _on_mqtt_message(self, client, userdata, message):
 
-		logging.debug("------------------------------------------")
-		logging.debug("Message received on topic: {0}".format(message.topic))
-		logging.debug(message.payload)
-		logging.debug("------------------------------------------")
+		print "------------------------------------------"
+		print "Message received on topic: {0}".format(message.topic)
+		print message.payload
+		print "------------------------------------------"
 
 		# assume this is the startBenchmark command
 		assert message.topic == self.OPENBENCHMARK_STARTBENCHMARK_REQUEST_TOPIC
@@ -131,7 +128,8 @@ class OrchestratorV1():
 			)
 
 		except Exception as e:
-			logging.exception("Malformed request or internal error. Responding with fail.")
+			print "Malformed request or internal error. Responding with fail."
+			traceback.print_exc()
 			# respond with fail
 			self.mqttClient.publish(
 				topic=self.OPENBENCHMARK_STARTBENCHMARK_RESPONSE_TOPIC,
@@ -179,7 +177,7 @@ class PerformanceEventHandler(threading.Thread):
 			self.mqttClient.loop_start()
 
 		except Exception as e:
-			logging.exception()
+			traceback.print_exc()
 			self.close()
 
 		if not os.path.exists(self.LOG_DIRNAME):
@@ -211,7 +209,7 @@ class PerformanceEventHandler(threading.Thread):
 			# blocking call
 			payload = self.messageQueue.get(block=True)
 			# TODO implement KPI calculation here
-			logging.info(payload)
+			print payload
 			with open(self.logFile, "a") as f:
 				json.dump(payload, f)
 				f.write('\n')
@@ -235,9 +233,9 @@ class PerformanceEventHandler(threading.Thread):
 			try:
 				self.messageQueue.put(payload, block=False)
 			except:
-				logging.warning("queue overflow")
+				print "queue overflow"
 		except:
-			logging.exception("Could not decode payload")
+			print "Could not decode payload"
 
 class OrchestrateExperiment(threading.Thread):
 
@@ -269,7 +267,7 @@ class OrchestrateExperiment(threading.Thread):
 		# give this thread a name
 		self.name = 'Orchestrate@' + self.scenarioConfigFile + '@' + self.experimentId
 
-		logging.info("Initializing thread: {0}.".format(self.name))
+		print "Initializing thread: {0}.".format(self.name)
 
 		with open(self.scenarioConfigFile, 'r') as f:
 
@@ -306,27 +304,27 @@ class OrchestrateExperiment(threading.Thread):
 		for genericId in self.scenarioNodes.keys():
 			expectedTestbedHost = self.scenarioNodes[genericId]['node_id']
 			self.scenarioNodes[genericId]['eui64'] = suffixedHosts[expectedTestbedHost]
-			logging.info("Mapping {0} -> {1} -> {2}.".format(genericId,
+			print "Mapping {0} -> {1} -> {2}.".format(genericId,
 													  expectedTestbedHost,
-													  self.scenarioNodes[genericId]['eui64']))
+													  self.scenarioNodes[genericId]['eui64'])
 
 		for genericId in self.scenarioNodes.keys():
 			# verify that all nodes have been mapped
 			assert self.scenarioNodes[genericId]['eui64']
 
-		logging.info("=========================================")
-		logging.info("broker                  = {0}".format(self.broker))
-		logging.info("experimentId            = {0}".format(self.experimentId))
-		logging.info("testbed                 = {0}".format(self.testbed))
-		logging.info("firmwareName            = {0}".format(self.firmwareName))
-		logging.info("requestNodes            = {0}".format(self.requestNodes))
-		logging.info("-----------------------------------------")
-		logging.info("Scenario                = {0}".format(self.scenarioConfigFile))
-		logging.info("totalDurationSec        = {0}".format(self.totalDurationSec))
-		logging.info("numberOfNodes           = {0}".format(self.numberOfNodes))
-		logging.info("payloadSize             = {0}".format(self.payloadSize))
-		logging.info("networkFormationTimeSec = {0}".format(self.networkFormationTimeSec))
-		logging.info("=========================================")
+		print "========================================="
+		print "broker                  = {0}".format(self.broker)
+		print "experimentId            = {0}".format(self.experimentId)
+		print "testbed                 = {0}".format(self.testbed)
+		print "firmwareName            = {0}".format(self.firmwareName)
+		print "requestNodes            = {0}".format(self.requestNodes)
+		print "-----------------------------------------"
+		print "Scenario                = {0}".format(self.scenarioConfigFile)
+		print "totalDurationSec        = {0}".format(self.totalDurationSec)
+		print "numberOfNodes           = {0}".format(self.numberOfNodes)
+		print "payloadSize             = {0}".format(self.payloadSize)
+		print "networkFormationTimeSec = {0}".format(self.networkFormationTimeSec)
+		print "========================================="
 
 		try:
 			# mqtt client
@@ -349,7 +347,7 @@ class OrchestrateExperiment(threading.Thread):
 
 		try:
 			# log
-			logging.info(("Experiment started. Thread: {0}".format(self.name)))
+			print("Experiment started. Thread: {0}".format(self.name))
 
 			while self.goOn:  # open serial port
 
@@ -364,7 +362,7 @@ class OrchestrateExperiment(threading.Thread):
 				self.triggerNetworkFormation(source=self.scenarioNodes['openbenchmark00']['eui64'])
 
 				# once network formation is triggered, sleep for N mins allowing the network to form
-				logging.info("Going to sleep for {0} minutes".format(self.networkFormationTimeSec/60.0))
+				print "Going to sleep for {0} minutes".format(self.networkFormationTimeSec/60.0)
 				time.sleep(self.networkFormationTimeSec)
 
 				while self.timeNow < self.totalDurationSec:
@@ -383,7 +381,7 @@ class OrchestrateExperiment(threading.Thread):
 							self.timeNow = timeInst
 
 						logLine = "Sending MQTT command: time={0}, source={1}, destination={2}, confirmable={3}, packetsInBurst={4} ".format(timeInst, source, destination, confirmable, packetsInBurst)
-						logging.debug(logLine)
+						print logLine
 						self.performanceEventHandler.append_line(logLine)
 
 						self.triggerSendPacket(source=self.scenarioNodes[source]['eui64'],
@@ -399,7 +397,7 @@ class OrchestrateExperiment(threading.Thread):
 				self.close()
 
 		except Exception as err:
-			logging.exception()
+			traceback.print_exc()
 			self.close()
 
 	# ======================== public ==========================================
@@ -505,7 +503,7 @@ class OrchestrateExperiment(threading.Thread):
 
 	def _on_mqtt_connect(self, client, userdata, flags, rc):
 		if rc != 0:
-			logging.warning("Unsuccesful MQTT connection. Return code: {0}".format(rc))
+			print "Unsuccesful MQTT connection. Return code: {0}".format(rc)
 			self.close()
 
 		# subscribe to the handled topics
@@ -545,7 +543,7 @@ class OrchestrateExperiment(threading.Thread):
 
 				subTopic = m.group(1)
 
-				logging.debug("Received response {0}".format(subTopic))
+				print("Received response {0}".format(subTopic))
 
 				payload = message.payload.decode('utf8')
 				assert payload, "Could not decode payload"
@@ -558,7 +556,7 @@ class OrchestrateExperiment(threading.Thread):
 				self.failureCounter += 1
 				traceback.print_exc()
 				if self.failureCounter >= self.ORCHESTRATE_MAX_FAILURE_COUNTER:
-					logging.exception("Too many failures, shutting down.")
+					print("Too many failures, shutting down.")
 					self.close()
 
 class OpenBenchmark:
