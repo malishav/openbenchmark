@@ -274,7 +274,6 @@ class OrchestrateExperiment(threading.Thread):
 			scenario = json.load(f)
 			self.totalDurationSec        = scenario['duration_min'] * 60
 			self.numberOfNodes           = scenario['number_of_nodes']
-			self.payloadSize             = scenario['payload_size']
 			self.networkFormationTimeSec = scenario['nf_time_padding_min'] * 60
 			self.scenarioNodes           = scenario['nodes']
 
@@ -322,7 +321,6 @@ class OrchestrateExperiment(threading.Thread):
 		print "Scenario                = {0}".format(self.scenarioConfigFile)
 		print "totalDurationSec        = {0}".format(self.totalDurationSec)
 		print "numberOfNodes           = {0}".format(self.numberOfNodes)
-		print "payloadSize             = {0}".format(self.payloadSize)
 		print "networkFormationTimeSec = {0}".format(self.networkFormationTimeSec)
 		print "========================================="
 
@@ -370,7 +368,7 @@ class OrchestrateExperiment(threading.Thread):
 					nextInstant = self.nextTrafficInstant(self.scenarioNodes)
 
 					if nextInstant:
-						(source, destination, timeInst, confirmable, packetsInBurst) = nextInstant
+						(source, destination, timeInst, confirmable, payloadSize, packetsInBurst) = nextInstant
 
 						# remove the source from the nodes list
 						del self.scenarioNodes[source]['traffic_sending_points'][0]
@@ -388,7 +386,7 @@ class OrchestrateExperiment(threading.Thread):
 											   destination=self.scenarioNodes[destination]['eui64'],
 											   confirmable=confirmable,
 											   packetsInBurst=packetsInBurst,
-											   payloadSize=self.payloadSize)
+											   payloadSize=payloadSize)
 					else:
 						# end of the experiment, get out of the while timeNow loop
 						break
@@ -472,6 +470,7 @@ class OrchestrateExperiment(threading.Thread):
 				destination = candidate['destination']
 				timeInst = candidate['time_sec']
 				confirmable = candidate['confirmable']
+				payloadSize = candidate['payload_size']
 				packetsInBurst = candidate.get('packets_in_burst', 1)
 
 			except IndexError:
@@ -480,6 +479,7 @@ class OrchestrateExperiment(threading.Thread):
 				destination = None
 				timeInst = None
 				confirmable = None
+				payloadSize = None
 				packetsInBurst = None
 			except:
 				traceback.print_exc()
@@ -489,7 +489,7 @@ class OrchestrateExperiment(threading.Thread):
 				if source is not None:
 					# convert to tuple for easier manip
 					candidatesList.append(
-						(source, destination, timeInst, confirmable, packetsInBurst)
+						(source, destination, timeInst, confirmable, payloadSize, packetsInBurst)
 					)
 		try:
 			# sort by time instant
