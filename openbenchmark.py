@@ -261,6 +261,9 @@ class OrchestrateExperiment(threading.Thread):
 		# sync primitives
 		self.timeLock = threading.Lock()
 
+		# Queue to match responses to requests
+		self.messageQueue = Queue.Queue(maxsize=1)
+
 		# flag to permit exit from read loop
 		self.goOn = True
 
@@ -349,6 +352,9 @@ class OrchestrateExperiment(threading.Thread):
 
 			while self.goOn:  # open serial port
 
+				# add some delay on startup to allow SUT to subscribe to topics
+				time.sleep(5)
+
 				# set tx power of each node to the one in the scenario file
 				for genericId in self.scenarioNodes.keys():
 					self.configureTransmitPower(source=self.scenarioNodes[genericId]['eui64'],
@@ -423,9 +429,10 @@ class OrchestrateExperiment(threading.Thread):
 		print json.dumps(logLine)
 		self.performanceEventHandler.append_line(json.dumps(logLine))
 
-		self.mqttClient.publish(
+		self._mqtt_publish_and_wait(
 			topic=topic,
 			payload=json.dumps(payload),
+			token=token,
 		)
 
 	def triggerNetworkFormation(self, source):
@@ -449,9 +456,10 @@ class OrchestrateExperiment(threading.Thread):
 		print json.dumps(logLine)
 		self.performanceEventHandler.append_line(json.dumps(logLine))
 
-		self.mqttClient.publish(
+		self._mqtt_publish_and_wait(
 			topic=topic,
 			payload=json.dumps(payload),
+			token=token,
 		)
 
 	def triggerSendPacket(self, source, destination, confirmable, packetsInBurst, payloadSize):
@@ -481,9 +489,10 @@ class OrchestrateExperiment(threading.Thread):
 		print json.dumps(logLine)
 		self.performanceEventHandler.append_line(json.dumps(logLine))
 
-		self.mqttClient.publish(
+		self._mqtt_publish_and_wait(
 			topic=topic,
 			payload=json.dumps(payload),
+			token=token,
 		)
 
 	''' Returns a tuple
@@ -580,16 +589,42 @@ class OrchestrateExperiment(threading.Thread):
 				payload = message.payload.decode('utf8')
 				assert payload, "Could not decode payload"
 
-				tokenReceived = json.loads(payload)['token']
-				success = json.loads(payload)['success']
+				payload = json.loads(payload)
+				tokenReceived = payload['token']
+				success = payload['success']
 
-				assert success, "Failure indicated by the SUT"
+				try:
+					self.messageQueue.put((tokenReceived, success), block=False)
+				except:
+					print "queue overflow"
+
 			except:
 				self.failureCounter += 1
 				traceback.print_exc()
 				if self.failureCounter >= self.ORCHESTRATE_MAX_FAILURE_COUNTER:
 					print("Too many failures, shutting down.")
 					self.close()
+
+	def _mqtt_publish_and_wait(self, topic, payload, token):
+
+		self.mqttClient.publish(
+			topic=topic,
+			payload=payload,
+		)
+
+		try:
+			(tokenReceived, success) = self.messageQueue.get(block=True, timeout=1)
+
+			assert tokenReceived == token
+			assert success
+
+		except:
+			print "Failure indicated or timeout occured."
+			self.failureCounter += 1
+			traceback.print_exc()
+			if self.failureCounter >= self.ORCHESTRATE_MAX_FAILURE_COUNTER:
+				print("Too many failures, shutting down.")
+				self.close()
 
 class OpenBenchmark:
 
