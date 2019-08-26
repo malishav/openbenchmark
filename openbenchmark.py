@@ -187,7 +187,7 @@ class PerformanceEventHandler(threading.Thread):
 		self.logfile = os.path.join(self.LOG_DIRNAME, self.logFile)
 
 		headerLine = {
-			'date' : self.date,
+			'date' 			: self.date,
 			'experimentId'  : self.experimentId,
 			'testbed'		: self.testbed,
 			'firmware'      : self.firmware,
@@ -208,7 +208,7 @@ class PerformanceEventHandler(threading.Thread):
 		while self.goOn:
 			# blocking call
 			payload = self.messageQueue.get(block=True)
-			# TODO implement KPI calculation here
+			# TODO implement real-time KPI calculation here
 			print payload
 			with open(self.logFile, "a") as f:
 				json.dump(payload, f)
@@ -378,10 +378,6 @@ class OrchestrateExperiment(threading.Thread):
 						with self.timeLock:
 							self.timeNow = timeInst
 
-						logLine = "Sending MQTT command: time={0}, source={1}, destination={2}, confirmable={3}, packetsInBurst={4} ".format(timeInst, source, destination, confirmable, packetsInBurst)
-						print logLine
-						self.performanceEventHandler.append_line(logLine)
-
 						self.triggerSendPacket(source=self.scenarioNodes[source]['eui64'],
 											   destination=self.scenarioNodes[destination]['eui64'],
 											   confirmable=confirmable,
@@ -409,29 +405,53 @@ class OrchestrateExperiment(threading.Thread):
 
 		token = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
 
+		payload = {
+			'token' : token,
+			'source': source,
+			'power' : int(power),
+		}
+
+		topic = "openbenchmark/experimentId/{0}/command/configureTransmitPower".format(self.experimentId)
+
+		logLine = {
+			"event" : "command",
+			"type"  : "configureTransmitPower",
+			"topic" : topic,
+		}
+		logLine.update(payload)
+
+		print json.dumps(logLine)
+		self.performanceEventHandler.append_line(json.dumps(logLine))
+
 		self.mqttClient.publish(
-			topic="openbenchmark/experimentId/{0}/command/configureTransmitPower".format(self.experimentId),
-			payload=json.dumps(
-				{
-					'token' : token,
-					'source': source,
-					'power' : int(power),
-				}
-			),
+			topic=topic,
+			payload=json.dumps(payload),
 		)
 
 	def triggerNetworkFormation(self, source):
 
 		token = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
 
+		payload = {
+			"token"  : token,
+			"source" : source,
+		}
+
+		topic = "openbenchmark/experimentId/{0}/command/triggerNetworkFormation".format(self.experimentId)
+
+		logLine = {
+			"event": "command",
+			"type": "triggerNetworkFormation",
+			"topic": topic,
+		}
+		logLine.update(payload)
+
+		print json.dumps(logLine)
+		self.performanceEventHandler.append_line(json.dumps(logLine))
+
 		self.mqttClient.publish(
-			topic="openbenchmark/experimentId/{0}/command/triggerNetworkFormation".format(self.experimentId),
-			payload=json.dumps(
-				{
-					'token' : token,
-					'source': source,
-				}
-			),
+			topic=topic,
+			payload=json.dumps(payload),
 		)
 
 	def triggerSendPacket(self, source, destination, confirmable, packetsInBurst, payloadSize):
@@ -439,19 +459,31 @@ class OrchestrateExperiment(threading.Thread):
 		token = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
 		packetToken = [0, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
 
+		payload = {
+			"token"            : token,
+			"source"           : source,
+			"destination"      : destination,
+			"packetsInBurst"   : int(packetsInBurst),
+			"packetToken"      : packetToken,
+			"packetPayloadLen" : int(payloadSize),
+			"confirmable"      : bool(confirmable),
+		}
+
+		topic = "openbenchmark/experimentId/{0}/command/sendPacket".format(self.experimentId)
+
+		logLine = {
+			"event": "command",
+			"type": "sendPacket",
+			"topic": topic,
+		}
+		logLine.update(payload)
+
+		print json.dumps(logLine)
+		self.performanceEventHandler.append_line(json.dumps(logLine))
+
 		self.mqttClient.publish(
-			topic="openbenchmark/experimentId/{0}/command/sendPacket".format(self.experimentId),
-			payload=json.dumps(
-				{
-					'token'            : token,
-					'source'           : source,
-					'destination'      : destination,
-					'packetsInBurst'   : int(packetsInBurst),
-					'packetToken'      : packetToken,
-					'packetPayloadLen' : int(payloadSize),
-					'confirmable'      : bool(confirmable),
-				}
-			),
+			topic=topic,
+			payload=json.dumps(payload),
 		)
 
 	''' Returns a tuple
