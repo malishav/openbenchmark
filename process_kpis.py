@@ -14,6 +14,7 @@ def calculate_latency(inputFile):
     packetSentEvents = []
     packetReceivedEvents = []
     latencies = []
+    processedSet = set()
 
     with open(inputFile, "r") as f:
         headerLine = json.loads(f.readline())
@@ -33,25 +34,30 @@ def calculate_latency(inputFile):
         # match the events according to the token
         for packetReceived in packetReceivedEvents:
             tokenReceived = packetReceived['packetToken']
-            for packetSent in packetSentEvents:
-                if packetSent['packetToken'] == tokenReceived:
+            # check if this token was already processed, useful to filter out duplicates
+            if tuple(tokenReceived) not in processedSet:
+                for packetSent in packetSentEvents:
+                    if packetSent['packetToken'] == tokenReceived:
 
-                    assert packetSent['source'] == packetReceived['destination']
-                    assert packetSent['destination'] == packetReceived['source']
+                        assert packetSent['source'] == packetReceived['destination']
+                        assert packetSent['destination'] == packetReceived['source']
 
-                    latencies += [ {
-                        "source" : packetSent['source'],
-                        "destination" : packetSent['destination'],
-                        "latency" : packetReceived['timestamp'] - packetSent['timestamp'],
-                        "hops"    : packetSent['hopLimit'] - packetReceived['hopLimit'],
-                    } ]
-                    break
+                        latencies += [ {
+                            "source" : packetSent['source'],
+                            "destination" : packetSent['destination'],
+                            "latency" : packetReceived['timestamp'] - packetSent['timestamp'],
+                            "hops"    : packetSent['hopLimit'] - packetReceived['hopLimit'],
+                        } ]
+
+                        processedSet.add(tuple(tokenReceived))
+                        break
 
     return { "latencies" : latencies }
 
 def calculate_reliability(inputFile):
     packetSentEvents = []
     packetReceivedEvents = []
+    commandSendPacketEvents = []
 
     with open(inputFile, "r") as f:
         headerLine = json.loads(f.readline())
@@ -68,10 +74,39 @@ def calculate_reliability(inputFile):
                 packetSentEvents += [candidate]
             elif candidate['event'] == 'packetReceived':
                 packetReceivedEvents += [candidate]
+            elif candidate['event'] == 'command' and candidate['type'] == 'sendPacket':
+                commandSendPacketEvents += [candidate]
 
-    reliability = len(packetReceivedEvents) / float(len(packetSentEvents))
+    # filter out the duplicates in packetReceivedEvents
+    packetReceivedTokens = []
+    for packetReceivedEvent in packetReceivedEvents:
+        packetReceivedTokens += [tuple(packetReceivedEvent['packetToken'])]
+    packetReceivedTokens = set(packetReceivedTokens)
 
-    return {"reliability": reliability}
+    # filter out the duplicates in packetSentEvents
+    packetSentTokens = []
+    for packetSentEvent in packetSentEvents:
+        packetSentTokens += [tuple(packetSentEvent['packetToken'])]
+    packetSentTokens = set(packetSentTokens)
+
+    commandSendPacketTokens = []
+    for command in commandSendPacketEvents:
+        commandSendPacketTokens += [tuple(command['packetToken'])]
+    commandSendPacketTokens = set(commandSendPacketTokens)
+
+    assert commandSendPacketTokens >= packetSentTokens
+    assert commandSendPacketTokens >= packetReceivedTokens
+    assert packetSentTokens        >= packetReceivedTokens
+
+    print packetSentTokens - packetReceivedTokens
+
+    reliabilitySent = 1 - len(packetSentTokens - packetReceivedTokens) / float(len(packetSentTokens))
+    reliabilityCommanded = 1 - len(commandSendPacketTokens - packetReceivedTokens) / float(len(commandSendPacketTokens))
+
+    return {
+        "reliabilitySent"       : reliabilitySent,
+        "reliabilityCommanded"  : reliabilityCommanded
+    }
 
 def calculate_join_times(inputFile):
     joinInstants = []
