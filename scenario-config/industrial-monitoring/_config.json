@@ -57845,42 +57845,42 @@
                     "time_sec": 144.877, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 1209.516, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 4333.192, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 5758.586, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 7621.728, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 9162.444, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }
             ]
@@ -57893,28 +57893,28 @@
                     "time_sec": 3245.966, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 4186.704, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 7343.554, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 10708.916, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }
             ]
@@ -57927,35 +57927,35 @@
                     "time_sec": 2924.372, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 4655.695, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 7775.261, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 10054.103, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }, 
                 {
                     "time_sec": 10782.297, 
                     "payload_size": 80, 
                     "destination": "openbenchmark00", 
-                    "packets_in_burst": 10, 
+                    "packets_in_burst": 5,
                     "confirmable": false
                 }
             ]
