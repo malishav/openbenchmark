@@ -226,7 +226,7 @@ class Wilab(Controller):
 
 	def _set_broker(self):
 		otbox_conf_file = os.path.join(self.JFED_DIR, "opentestbed", "deployment", "sensor", "sensor-supervisord.conf.j2")
-		content = "[program:otbox]\ncommand     = /usr/local/bin/opentestbed -v\nenvironment = OTB_TESTBED='wilab', OTB_BROKER='{0}'\nautostart   = true\nautorestart = true\ndirectory = /tmp".format(self.mqtt_client.broker)
+		content = "[program:otbox]\ncommand     = /usr/bin/python /opt/opentestbed/otbox.py -v --testbed \"wilab\" --broker \"{0}\"\nautostart   = true\nautorestart = true\ndirectory = /opt/opentestbed".format(self.mqtt_client.broker)
 
 		with open(otbox_conf_file, 'w') as f:
 			f.write(content)
