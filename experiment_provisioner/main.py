@@ -243,7 +243,7 @@ class Wilab(Controller):
 		with open(start_exp_yml_temp, 'r') as f:
 			yml_conf = yaml.load(f, Loader=yaml.FullLoader)
 			yml_conf['experiment']['slice']['sliceName'] = slice_name
-			yml_conf['experiment']['slice']['expireTimeMin'] = 30
+			yml_conf['experiment']['slice']['expireTimeMin'] = self.EXP_DURATION
 			yml_conf['user']['password'] = self.PASSWORD
 
 		with open(start_exp_yml, 'w') as f:
