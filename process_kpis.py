@@ -96,9 +96,6 @@ def calculate_reliability(inputFile):
 
     assert commandSendPacketTokens >= packetSentTokens
     assert commandSendPacketTokens >= packetReceivedTokens
-    assert packetSentTokens        >= packetReceivedTokens
-
-    print packetSentTokens - packetReceivedTokens
 
     reliabilitySent = 1 - len(packetSentTokens - packetReceivedTokens) / float(len(packetSentTokens))
     reliabilityCommanded = 1 - len(commandSendPacketTokens - packetReceivedTokens) / float(len(commandSendPacketTokens))
