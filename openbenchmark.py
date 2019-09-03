@@ -287,11 +287,6 @@ class OrchestrateExperiment(threading.Thread):
 			for k,v in scenarioTestbed.iteritems():
 				self.scenarioNodes[k].update(v)
 
-		# sanity check
-		assert len(self.scenarioNodes) == len(self.requestNodes), "Inconsistent number of nodes. " \
-                                                                  "Scenario file and the request received " \
-                                                                  "from the SUT do not match up."
-
 		# if the request arrives with more than one eui64 address attached to a given host name, append suffix to it
 		# suffixed host matches the testbed-specific scenario file
 		suffixedHosts = {}
