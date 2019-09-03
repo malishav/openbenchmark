@@ -1,46 +1,46 @@
 {
     "openbenchmark00": {
-        "node_id": "nuc10-36",
+        "node_id": "nuc0-7@1",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark01": {
-        "node_id": "nuc10-35",
+        "node_id": "nuc0-8@0",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark02": {
-        "node_id": "nuc10-34",
+        "node_id": "nuc0-3@0",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark03": {
-        "node_id": "nuc10-33",
+        "node_id": "nuc0-3@1",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark04": {
-        "node_id": "nuc10-32",
+        "node_id": "nuc0-4@0",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark05": {
-        "node_id": "nuc10-31",
+        "node_id": "nuc0-4@1",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark06": {
-        "node_id": "nuc10-30",
+        "node_id": "nuc0-5@0",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark07": {
-        "node_id": "nuc10-29",
+        "node_id": "nuc0-5@1",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark08": {
-        "node_id": "nuc10-13",
+        "node_id": "nuc0-6@0",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark09": {
-        "node_id": "nuc10-14",
+        "node_id": "nuc0-6@1",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark10": {
-        "node_id": "nuc10-37",
+        "node_id": "nuc0-7@0",
         "transmission_power_dbm": 0
     }
 }

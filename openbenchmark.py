@@ -293,7 +293,7 @@ class OrchestrateExperiment(threading.Thread):
 		for host, v in self.requestNodes.iteritems():
 			if len(v) > 1:
 				for index, eui64 in enumerate(v):
-					suffixedHosts["{0}-{1}".format(host, index)] = eui64
+					suffixedHosts["{0}@{1}".format(host, index)] = eui64
 			else:
 				suffixedHosts[host] = v[0]
 

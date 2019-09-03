@@ -216,8 +216,7 @@ class Wilab(Controller):
 			config_obj = json.load(f)
 
 			for generic_id in config_obj:
-				testbed_id_split = config_obj[generic_id]["node_id"].split("-")
-				nuc_id = testbed_id_split[0] + "-" + testbed_id_split[1]
+				nuc_id = config_obj[generic_id]["node_id"].split("@")[0]
 
 				if nuc_id not in nucs:
 					nucs.append(nuc_id)
