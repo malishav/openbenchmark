@@ -2,7 +2,7 @@
     "identifier": "demo-scenario", 
     "duration_min": 60, 
     "number_of_nodes": 11, 
-    "nf_time_padding_min": 15, 
+    "nf_time_padding_min": 15,
     "nodes": {
         "openbenchmark00": {
             "role": "gateway", 

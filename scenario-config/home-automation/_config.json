@@ -2,7 +2,7 @@
     "identifier": "home-automation", 
     "duration_min": 180, 
     "number_of_nodes": 31, 
-    "nf_time_padding_min": 15, 
+    "nf_time_padding_min": 30,
     "nodes": {
         "openbenchmark00": {
             "role": "control-unit", 
