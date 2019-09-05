@@ -59,9 +59,8 @@ class OrchestratorV1():
 		self.goOn = False
 		if self.mqttClient:
 			self.mqttClient.loop_stop()
-		for (thread1, thread2) in self.threads:
-			thread1.close()
-			thread2.close()
+		for thread in self.threads:
+			thread.close()
 
 	def _on_mqtt_connect(self, client, userdata, flags, rc):
 		self.mqttClient.subscribe(self.OPENBENCHMARK_STARTBENCHMARK_REQUEST_TOPIC)
@@ -95,25 +94,18 @@ class OrchestratorV1():
 
 			experimentId = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
 
-			performanceEventThread = PerformanceEventHandler(broker=self.broker,
-															 experimentId=experimentId,
-															 scenario=scenario,
-															 testbed=testbed,
-															 firmware=firmwareName,
-															 date=date,
-															 nodes=nodes)
-
 			orchestrateThread = OrchestrateExperiment(broker=self.broker,
 													   experimentId=experimentId,
-													   performanceEventHandler=performanceEventThread,
+													   scenario=scenario,
 													   scenarioDir=SCENARIO_TO_DIR[scenario],
 													   testbed=testbed,
 													   firmwareName=firmwareName,
+													   date=date,
 													   nodes=nodes)
 
 
 
-			self.threads += [ (orchestrateThread, performanceEventThread) ]
+			self.threads += [ orchestrateThread ]
 
 			# respond with success
 			self.mqttClient.publish(
@@ -241,7 +233,7 @@ class OrchestrateExperiment(threading.Thread):
 
 	ORCHESTRATE_MAX_FAILURE_COUNTER = 5
 
-	def __init__(self, broker, experimentId, performanceEventHandler, scenarioDir, testbed, firmwareName, nodes):
+	def __init__(self, broker, experimentId, scenario, scenarioDir, testbed, firmwareName, date, nodes):
 
 		# initialize the parent class
 		threading.Thread.__init__(self)
@@ -249,14 +241,15 @@ class OrchestrateExperiment(threading.Thread):
 		# local vars
 		self.broker = broker
 		self.experimentId = experimentId
-		self.performanceEventHandler = performanceEventHandler
 		self.testbed = testbed
+		self.scenario = scenario
 		self.scenarioConfigFile = os.path.join(scenarioDir, SCENARIO_CONFIG_FILENAME)
 		self.scenarioTestbedFile = os.path.join(scenarioDir, '_{0}{1}'.format(self.testbed, SCENARIO_CONFIG_FILENAME))
 		self.firmwareName = firmwareName
 		self.requestNodes = nodes
 		self.timeNow = 0
 		self.failureCounter = 0
+		self.date = date
 
 		# sync primitives
 		self.timeLock = threading.Lock()
@@ -334,6 +327,15 @@ class OrchestrateExperiment(threading.Thread):
 			traceback.print_exc()
 			self.close()
 
+		# start a thread that will catch performance-related events and log them
+		self.performanceEventHandler = PerformanceEventHandler(broker=self.broker,
+															 experimentId=self.experimentId,
+															 scenario=self.scenario,
+															 testbed=self.testbed,
+															 firmware=self.firmwareName,
+															 date=self.date,
+															 nodes=self.requestNodes)
+
 		# start myself
 		self.start()
 
@@ -398,6 +400,7 @@ class OrchestrateExperiment(threading.Thread):
 	# ======================== public ==========================================
 
 	def close(self):
+		self.performanceEventHandler.close()
 		self.goOn = False
 		with self.timeLock:
 			self.timeNow = self.totalDurationSec + 1
