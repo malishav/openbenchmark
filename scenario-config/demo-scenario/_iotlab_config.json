@@ -1,10 +1,10 @@
 {
     "openbenchmark00": {
-        "node_id": "node-a8-116",
+        "node_id": "node-a8-117",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark01": {
-        "node_id": "node-a8-117",
+        "node_id": "node-a8-116",
         "transmission_power_dbm": 0
     }, 
     "openbenchmark02": {
