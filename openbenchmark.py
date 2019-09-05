@@ -390,6 +390,12 @@ class OrchestrateExperiment(threading.Thread):
 						# end of the experiment, get out of the while timeNow loop
 						break
 
+				# give some time for all remaining events to arrive at the performanceEventHandler thread
+				time.sleep(5)
+
+				# send the endExperiment MQTT command
+				self.communicateEndExperiment()
+
 				print "End of the experiment. Shutting down thread {0}".format(self.name)
 				self.close()
 
@@ -404,6 +410,31 @@ class OrchestrateExperiment(threading.Thread):
 		self.goOn = False
 		with self.timeLock:
 			self.timeNow = self.totalDurationSec + 1
+
+	def communicateEndExperiment(self):
+		token = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
+
+		payload = {
+			"token"  : token,
+		}
+
+		topic = "openbenchmark/experimentId/{0}/command/endExperiment".format(self.experimentId)
+
+		logLine = {
+			"event": "command",
+			"type": "endExperiment",
+			"topic": topic,
+		}
+		logLine.update(payload)
+
+		print json.dumps(logLine)
+		self.performanceEventHandler.append_line(json.dumps(logLine))
+
+		# fire and forget, do not wait for response
+		self.mqttClient.publish(
+			topic=topic,
+			payload=json.dumps(payload),
+		)
 
 	def configureTransmitPower(self, source, power):
 
