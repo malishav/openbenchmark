@@ -52,6 +52,8 @@ def calculate_latency(inputFile):
                         processedSet.add(tuple(tokenReceived))
                         break
 
+    returnDict = { "latencies" : latencies }
+    print "Number of packets received: {0}".format(len(latencies))
     return { "latencies" : latencies }
 
 def calculate_reliability(inputFile):
@@ -105,6 +107,7 @@ def calculate_reliability(inputFile):
         "reliabilityCommanded"  : reliabilityCommanded
     }
 
+    print "Number of packets commanded: {0}".format(len(commandSendPacketTokens))
     print returnDict
 
     return returnDict
