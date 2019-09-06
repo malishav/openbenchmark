@@ -100,10 +100,14 @@ def calculate_reliability(inputFile):
     reliabilitySent = 1 - len(packetSentTokens - packetReceivedTokens) / float(len(packetSentTokens))
     reliabilityCommanded = 1 - len(commandSendPacketTokens - packetReceivedTokens) / float(len(commandSendPacketTokens))
 
-    return {
+    returnDict = {
         "reliabilitySent"       : reliabilitySent,
         "reliabilityCommanded"  : reliabilityCommanded
     }
+
+    print returnDict
+
+    return returnDict
 
 def calculate_join_times(inputFile):
     joinInstants = []
