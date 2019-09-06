@@ -46,7 +46,7 @@ def calculate_latency(inputFile):
                             "source" : packetSent['source'],
                             "destination" : packetSent['destination'],
                             "latency" : packetReceived['timestamp'] - packetSent['timestamp'],
-                            "hops"    : packetSent['hopLimit'] - packetReceived['hopLimit'],
+                            "hops"    : packetSent['hopLimit'] - packetReceived['hopLimit'] + 1,
                         } ]
 
                         processedSet.add(tuple(tokenReceived))
