@@ -58,7 +58,7 @@ class OTBoxStartup:
 
         # Fetch the latest version of opentestbed software in the shared A8 director of the SSH frontend
         self.ssh_command_exec(
-            'cd A8; rm -rf opentestbed; git clone {0}; cd opentestbed; git fetch --tags; git checkout {1};'.format(self.otb_repo, self.otb_tag))
+            'cd A8; rm -rf opentestbed; git clone {0}; cd opentestbed; git fetch ; git checkout {1};'.format(self.otb_repo, self.otb_tag))
 
     def ssh_connect(self):
         self.client.connect(self.domain, username=self.user)
