@@ -131,25 +131,37 @@ def calculate_reliability(inputDir):
 
     return returnDict
 
-def calculate_join_times(inputFile):
-    joinInstants = []
+def calculate_join_times(inputDir):
+    maxJoinTimes = []
 
+    for inputFile in glob.glob(os.path.join(inputDir, '*.log')):
 
-    with open(inputFile, "r") as f:
-        headerLine = json.loads(f.readline())
+        joinInstants = []
 
-        print "Processing join times for experiment {0} executed on {1}".format(headerLine['experimentId'],
-                                                                             headerLine['date'])
+        with open(inputFile, "r") as f:
+            headerLine = json.loads(f.readline())
 
-        # first fetch the events of interest
-        for line in f:
-            candidate = json.loads(line)
+            print "Processing join times for experiment {0} executed on {1}".format(headerLine['experimentId'],
+                                                                                 headerLine['date'])
 
-            # filter out the events of interest
-            if candidate['event'] == 'secureJoinCompleted':
-                joinInstants += [candidate['timestamp']]
+            # first fetch the events of interest
+            for line in f:
+                candidate = json.loads(line)
 
-    return {"joinInstants": joinInstants}
+                # filter out the events of interest
+                if candidate['event'] == 'secureJoinCompleted':
+                    joinInstants += [candidate['timestamp']]
+
+        maxJoinTimes += [max(joinInstants)] if len(joinInstants) != 0 else []
+
+    return {
+        "joinTime" : {
+                        'mean' : mean(maxJoinTimes),
+                        'min'  : min(maxJoinTimes),
+                        'max'  : max(maxJoinTimes),
+                        '99%'  : numpy.percentile(maxJoinTimes, 99)
+                    }
+        }
 
 def calculate_sync_times(inputFile):
     syncInstants = []
@@ -181,7 +193,7 @@ def main():
 
     kpis.update(calculate_latency(inputDir))
     kpis.update(calculate_reliability(inputDir))
-    #kpis.update(calculate_join_times(inputDir))
+    kpis.update(calculate_join_times(inputDir))
     #kpis.update(calculate_sync_times(inputDir))
 
     with open(outputFile, "w") as f:
