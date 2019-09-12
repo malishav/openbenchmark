@@ -1,100 +1,119 @@
 import argparse
 import json
+import numpy
+import os
+import glob
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--log',
-                    dest='log',
+parser.add_argument('--logDir',
+                    dest='logDir',
                     required=True,
                     action='store',
                     )
+def mean(numbers):
+    return float(sum(numbers)) / max(len(numbers), 1)
 
+def calculate_latency(inputDir):
+    latencies = {}
+    returnDict = {}
+    lenProcessed = 0
 
-def calculate_latency(inputFile):
-    packetSentEvents = []
-    packetReceivedEvents = []
-    latencies = []
-    processedSet = set()
+    for inputFile in glob.glob(os.path.join(inputDir, '*.log')):
+        processedSet = set()
+        packetSentEvents = []
+        packetReceivedEvents = []
 
-    with open(inputFile, "r") as f:
-        headerLine = json.loads(f.readline())
+        with open(inputFile, "r") as f:
+            headerLine = json.loads(f.readline())
 
-        print "Processing latency for experiment {0} executed on {1}".format(headerLine['experimentId'], headerLine['date'])
+            print "Processing latency for experiment {0} executed on {1}".format(headerLine['experimentId'], headerLine['date'])
 
-        # first fetch the events of interest
-        for line in f:
-            candidate = json.loads(line)
+            # first fetch the events of interest
+            for line in f:
+                candidate = json.loads(line)
 
-            # filter out the events of interest
-            if candidate['event'] == 'packetSent':
-                packetSentEvents += [candidate]
-            elif candidate['event']  == 'packetReceived':
-                packetReceivedEvents += [candidate]
+                # filter out the events of interest
+                if candidate['event'] == 'packetSent':
+                    packetSentEvents += [candidate]
+                elif candidate['event']  == 'packetReceived':
+                    packetReceivedEvents += [candidate]
 
-        # match the events according to the token
-        for packetReceived in packetReceivedEvents:
-            tokenReceived = packetReceived['packetToken']
-            # check if this token was already processed, useful to filter out duplicates
-            if tuple(tokenReceived) not in processedSet:
-                for packetSent in packetSentEvents:
-                    if packetSent['packetToken'] == tokenReceived:
+            # match the events according to the token
+            for packetReceived in packetReceivedEvents:
+                tokenReceived = packetReceived['packetToken']
+                # check if this token was already processed, useful to filter out duplicates
+                if tuple(tokenReceived) not in processedSet:
+                    for packetSent in packetSentEvents:
+                        if packetSent['packetToken'] == tokenReceived:
 
-                        assert packetSent['source'] == packetReceived['destination']
-                        assert packetSent['destination'] == packetReceived['source']
+                            assert packetSent['source'] == packetReceived['destination']
+                            assert packetSent['destination'] == packetReceived['source']
 
-                        latencies += [ {
-                            "source" : packetSent['source'],
-                            "destination" : packetSent['destination'],
-                            "latency" : packetReceived['timestamp'] - packetSent['timestamp'],
-                            "hops"    : packetSent['hopLimit'] - packetReceived['hopLimit'] + 1,
-                        } ]
+                            hopsTraversed = packetSent['hopLimit'] - packetReceived['hopLimit'] + 1
+                            latency = packetReceived['timestamp'] - packetSent['timestamp']
 
-                        processedSet.add(tuple(tokenReceived))
-                        break
+                            if hopsTraversed in latencies:
+                                latencies[hopsTraversed] += [latency]
+                            else:
+                                latencies[hopsTraversed] = [latency]
 
-    returnDict = { "latencies" : latencies }
-    print "Number of packets received: {0}".format(len(latencies))
-    return { "latencies" : latencies }
+                            processedSet.add(tuple(tokenReceived))
+                            break
+            lenProcessed += len(processedSet)
 
-def calculate_reliability(inputFile):
+    for key in latencies:
+        returnDict['{0}_hop_latency'.format(key)] = {
+                                                     'mean' : mean(latencies[key]),
+                                                     'min' : min(latencies[key]),
+                                                     'max' : max(latencies[key]),
+                                                     '99%' : numpy.percentile(latencies[key], 99)
+                                                     }
+
+    print "Number of packets received: {0}".format(lenProcessed)
+    print returnDict
+    return returnDict
+
+def calculate_reliability(inputDir):
     packetSentEvents = []
     packetReceivedEvents = []
     commandSendPacketEvents = []
 
-    with open(inputFile, "r") as f:
-        headerLine = json.loads(f.readline())
+    for inputFile in glob.glob(os.path.join(inputDir, '*.log')):
+        with open(inputFile, "r") as f:
+            headerLine = json.loads(f.readline())
 
-        print "Processing reliability for experiment {0} executed on {1}".format(headerLine['experimentId'],
-                                                                             headerLine['date'])
+            print "Processing reliability for experiment {0} executed on {1}".format(headerLine['experimentId'],
+                                                                                 headerLine['date'])
 
-        # first fetch the events of interest
-        for line in f:
-            candidate = json.loads(line)
+            # first fetch the events of interest
+            for line in f:
+                candidate = json.loads(line)
 
-            # filter out the events of interest
-            if candidate['event'] == 'packetSent':
-                packetSentEvents += [candidate]
-            elif candidate['event'] == 'packetReceived':
-                packetReceivedEvents += [candidate]
-            elif candidate['event'] == 'command' and candidate['type'] == 'sendPacket':
-                commandSendPacketEvents += [candidate]
+                # filter out the events of interest
+                if candidate['event'] == 'packetSent':
+                    packetSentEvents += [candidate]
+                elif candidate['event'] == 'packetReceived':
+                    packetReceivedEvents += [candidate]
+                elif candidate['event'] == 'command' and candidate['type'] == 'sendPacket':
+                    commandSendPacketEvents += [candidate]
 
-    # filter out the duplicates in packetReceivedEvents
-    packetReceivedTokens = []
-    for packetReceivedEvent in packetReceivedEvents:
-        packetReceivedTokens += [tuple(packetReceivedEvent['packetToken'])]
-    packetReceivedTokens = set(packetReceivedTokens)
+        # filter out the duplicates in packetReceivedEvents
+        packetReceivedTokens = []
+        for packetReceivedEvent in packetReceivedEvents:
+            packetReceivedTokens += [tuple(packetReceivedEvent['packetToken'])]
+        packetReceivedTokens = set(packetReceivedTokens)
 
-    # filter out the duplicates in packetSentEvents
-    packetSentTokens = []
-    for packetSentEvent in packetSentEvents:
-        packetSentTokens += [tuple(packetSentEvent['packetToken'])]
-    packetSentTokens = set(packetSentTokens)
+        # filter out the duplicates in packetSentEvents
+        packetSentTokens = []
+        for packetSentEvent in packetSentEvents:
+            packetSentTokens += [tuple(packetSentEvent['packetToken'])]
+        packetSentTokens = set(packetSentTokens)
 
-    commandSendPacketTokens = []
-    for command in commandSendPacketEvents:
-        commandSendPacketTokens += [tuple(command['packetToken'])]
-    commandSendPacketTokens = set(commandSendPacketTokens)
+        commandSendPacketTokens = []
+        for command in commandSendPacketEvents:
+            commandSendPacketTokens += [tuple(command['packetToken'])]
+        commandSendPacketTokens = set(commandSendPacketTokens)
 
     assert commandSendPacketTokens >= packetSentTokens
     assert commandSendPacketTokens >= packetReceivedTokens
@@ -155,18 +174,18 @@ def calculate_sync_times(inputFile):
 def main():
 
     args = parser.parse_args()
-    inputFile = args.log
-    outputFile = args.log + ".kpi"
+    inputDir = args.logDir
+    outputFile = os.path.join(args.logDir,  args.logDir.strip('/') + ".kpi")
 
     kpis = {}
 
-    kpis.update(calculate_latency(inputFile))
-    kpis.update(calculate_reliability(inputFile))
-    kpis.update(calculate_join_times(inputFile))
-    kpis.update(calculate_sync_times(inputFile))
+    kpis.update(calculate_latency(inputDir))
+    kpis.update(calculate_reliability(inputDir))
+    #kpis.update(calculate_join_times(inputDir))
+    #kpis.update(calculate_sync_times(inputDir))
 
     with open(outputFile, "w") as f:
-        json.dump(kpis, f)
+        json.dump(kpis, f, indent=4)
         f.write('\n')
 
 
