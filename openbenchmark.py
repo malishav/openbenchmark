@@ -247,6 +247,7 @@ class OrchestrateExperiment(threading.Thread):
 		self.scenarioTestbedFile = os.path.join(scenarioDir, '_{0}{1}'.format(self.testbed, SCENARIO_CONFIG_FILENAME))
 		self.firmwareName = firmwareName
 		self.requestNodes = nodes
+		self.mappedNodes = {}
 		self.timeNow = 0
 		self.failureCounter = 0
 		self.date = date
@@ -298,6 +299,11 @@ class OrchestrateExperiment(threading.Thread):
 													  expectedTestbedHost,
 													  self.scenarioNodes[genericId]['eui64'])
 
+			self.mappedNodes[genericId] = {
+				'node_id' : expectedTestbedHost,
+				'eui64'   : self.scenarioNodes[genericId]['eui64']
+			}
+
 		for genericId in self.scenarioNodes.keys():
 			# verify that all nodes have been mapped
 			assert self.scenarioNodes[genericId]['eui64']
@@ -334,7 +340,7 @@ class OrchestrateExperiment(threading.Thread):
 															 testbed=self.testbed,
 															 firmware=self.firmwareName,
 															 date=self.date,
-															 nodes=self.requestNodes)
+															 nodes=self.mappedNodes)
 
 		# start myself
 		self.start()
