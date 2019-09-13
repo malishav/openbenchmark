@@ -116,11 +116,7 @@
         "transmission_power_dbm": 0
     }, 
     "openbenchmark29": {
-        "node_id": "nuc0-44@0",
+        "node_id": "nuc0-28@1",
         "transmission_power_dbm": 0
-    }, 
-    "openbenchmark30": {
-        "node_id": "nuc0-44@1",
-        "transmission_power_dbm": 0
-    }
+    } 
 }
