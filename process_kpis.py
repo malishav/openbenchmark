@@ -15,17 +15,31 @@ def mean(numbers):
     return float(sum(numbers)) / max(len(numbers), 1)
 
 def calculate_latency(inputDir):
-    latencies = {}
+    # indexed by number of hops
+    latenciesUpstream = {}
+
     returnDict = {}
-    lenProcessed = 0
+
+    # total number of processed upstream packets
+    lenProcessedUpstream = 0
 
     for inputFile in glob.glob(os.path.join(inputDir, '*.log')):
-        processedSet = set()
-        packetSentEvents = []
-        packetReceivedEvents = []
+        processedSetUpstream = set()
+        processedSetDownstream = set()
+        processedSetP2P = set()
+        packetSentEventsUpstream = []
+        packetReceivedEventsUpstream = []
+        packetSentEventsDownstream = []
+        packetReceivedEventsDownstream = []
+        packetSentEventsP2P = []
+        packetReceivedEventsP2P = []
 
         with open(inputFile, "r") as f:
             headerLine = json.loads(f.readline())
+
+            # root is by convention always openbenchmark00 node
+            root = headerLine['nodes']['openbenchmark00']['eui64']
+            print root
 
             print "Processing latency for experiment {0} executed on {1}".format(headerLine['experimentId'], headerLine['date'])
 
@@ -33,18 +47,28 @@ def calculate_latency(inputDir):
             for line in f:
                 candidate = json.loads(line)
 
-                # filter out the events of interest
-                if candidate['event'] == 'packetSent':
-                    packetSentEvents += [candidate]
-                elif candidate['event']  == 'packetReceived':
-                    packetReceivedEvents += [candidate]
+                # filter out the events of interest: for upstream latency we care only about packets destined for the root
+                if candidate['event'] == 'packetSent' and candidate['destination'] == root:
+                    packetSentEventsUpstream += [candidate]
+                elif candidate['event']  == 'packetReceived' and candidate['source' == root]:
+                    packetReceivedEventsUpstream += [candidate]
+                # for downstream, we care about packets originated by the root
+                elif candidate['event'] == 'packetSent' and candidate['source'] == root:
+                    packetSentEventsDownstream += [candidate]
+                elif candidate['event'] == 'packetReceived' and candidate['destination'] == root:
+                    packetReceivedEventsDownstream += [candidate]
+                # anything else is peer to peer
+                elif candidate['event'] == 'packetSent':
+                    packetSentEventsP2P += [candidate]
+                elif candidate['event'] == 'packetReceived':
+                    packetReceivedEventsP2P += [candidate]
 
             # match the events according to the token
-            for packetReceived in packetReceivedEvents:
+            for packetReceived in packetReceivedEventsUpstream:
                 tokenReceived = packetReceived['packetToken']
                 # check if this token was already processed, useful to filter out duplicates
-                if tuple(tokenReceived) not in processedSet:
-                    for packetSent in packetSentEvents:
+                if tuple(tokenReceived) not in processedSetUpstream:
+                    for packetSent in packetSentEventsUpstream:
                         if packetSent['packetToken'] == tokenReceived:
 
                             assert packetSent['source'] == packetReceived['destination']
@@ -53,24 +77,28 @@ def calculate_latency(inputDir):
                             hopsTraversed = packetSent['hopLimit'] - packetReceived['hopLimit'] + 1
                             latency = packetReceived['timestamp'] - packetSent['timestamp']
 
-                            if hopsTraversed in latencies:
-                                latencies[hopsTraversed] += [latency]
+                            if hopsTraversed in latenciesUpstream:
+                                latenciesUpstream[hopsTraversed] += [latency]
                             else:
-                                latencies[hopsTraversed] = [latency]
+                                latenciesUpstream[hopsTraversed] = [latency]
 
-                            processedSet.add(tuple(tokenReceived))
+                            processedSetUpstream.add(tuple(tokenReceived))
                             break
-            lenProcessed += len(processedSet)
+            lenProcessedUpstream += len(processedSetUpstream)
 
-    for key in latencies:
-        returnDict['{0}_hop_latency'.format(key)] = {
-                                                     'mean' : mean(latencies[key]),
-                                                     'min' : min(latencies[key]),
-                                                     'max' : max(latencies[key]),
-                                                     '99%' : numpy.percentile(latencies[key], 99)
+            # TODO Downstream Latencies
+
+            # TODO P2P Latencies
+
+    for key in latenciesUpstream:
+        returnDict['{0}_hop_latency_upstream'.format(key)] = {
+                                                     'mean' : mean(latenciesUpstream[key]),
+                                                     'min' : min(latenciesUpstream[key]),
+                                                     'max' : max(latenciesUpstream[key]),
+                                                     '99%' : numpy.percentile(latenciesUpstream[key], 99)
                                                      }
 
-    print "Number of packets received: {0}".format(lenProcessed)
+    print "Number of upstream packets processed: {0}".format(lenProcessedUpstream)
     print returnDict
     return returnDict
 
