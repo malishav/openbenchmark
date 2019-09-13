@@ -118,9 +118,5 @@
     "openbenchmark29": {
         "node_id": "emulated30",
         "transmission_power_dbm": 0
-    }, 
-    "openbenchmark30": {
-        "node_id": "emulated31",
-        "transmission_power_dbm": 0
     }
 }

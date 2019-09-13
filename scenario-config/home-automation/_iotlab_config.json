@@ -118,9 +118,5 @@
     "openbenchmark29": {
         "node_id": "node-a8-71",
         "transmission_power_dbm": 0
-    }, 
-    "openbenchmark30": {
-        "node_id": "node-a8-77",
-        "transmission_power_dbm": 0
     }
 }
