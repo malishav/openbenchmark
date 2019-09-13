@@ -136,7 +136,7 @@ def calculate_join_times(inputDir):
 
     for inputFile in glob.glob(os.path.join(inputDir, '*.log')):
 
-        joinInstants = []
+        joinDict = {}
 
         with open(inputFile, "r") as f:
             headerLine = json.loads(f.readline())
@@ -150,9 +150,16 @@ def calculate_join_times(inputDir):
 
                 # filter out the events of interest
                 if candidate['event'] == 'secureJoinCompleted':
-                    joinInstants += [candidate['timestamp']]
+                    source = candidate['source']
 
-        maxJoinTimes += [max(joinInstants)] if len(joinInstants) != 0 else []
+                    if source not in joinDict:
+                        joinDict[source] = candidate['timestamp']
+                    else:
+                        # node must have rebooted, skip any but the first join instant
+                        pass
+
+        print "Number of join instants: {0}".format(len(joinDict.values()))
+        maxJoinTimes += [max(joinDict.values())] if len(joinDict.values()) != 0 else []
 
     return {
         "joinTime" : {
