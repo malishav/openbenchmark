@@ -35,13 +35,13 @@ def calculate_latency(inputDir):
         packetReceivedEventsP2P = []
 
         with open(inputFile, "r") as f:
+            print "Processing {0}".format(inputFile)
             headerLine = json.loads(f.readline())
 
             # root is by convention always openbenchmark00 node
             root = headerLine['nodes']['openbenchmark00']['eui64']
-            print root
 
-            print "Processing latency for experiment {0} executed on {1}".format(headerLine['experimentId'], headerLine['date'])
+            print "Processing latency for experiment {0} executed on {1}. Root eui64={2}.".format(headerLine['experimentId'], headerLine['date'], root)
 
             # first fetch the events of interest
             for line in f:
@@ -50,7 +50,7 @@ def calculate_latency(inputDir):
                 # filter out the events of interest: for upstream latency we care only about packets destined for the root
                 if candidate['event'] == 'packetSent' and candidate['destination'] == root:
                     packetSentEventsUpstream += [candidate]
-                elif candidate['event']  == 'packetReceived' and candidate['source' == root]:
+                elif candidate['event']  == 'packetReceived' and candidate['source'] == root:
                     packetReceivedEventsUpstream += [candidate]
                 # for downstream, we care about packets originated by the root
                 elif candidate['event'] == 'packetSent' and candidate['source'] == root:
@@ -103,11 +103,15 @@ def calculate_latency(inputDir):
     return returnDict
 
 def calculate_reliability(inputDir):
-    packetSentEvents = []
-    packetReceivedEvents = []
-    commandSendPacketEvents = []
+    reliabilitySent = []
+    reliabilityCommanded = []
+    returnDict = {}
 
     for inputFile in glob.glob(os.path.join(inputDir, '*.log')):
+        packetSentEvents = []
+        packetReceivedEvents = []
+        commandSendPacketEvents = []
+
         with open(inputFile, "r") as f:
             headerLine = json.loads(f.readline())
 
@@ -143,18 +147,32 @@ def calculate_reliability(inputDir):
             commandSendPacketTokens += [tuple(command['packetToken'])]
         commandSendPacketTokens = set(commandSendPacketTokens)
 
-    assert commandSendPacketTokens >= packetSentTokens
-    assert commandSendPacketTokens >= packetReceivedTokens
+        assert commandSendPacketTokens >= packetSentTokens
+        assert commandSendPacketTokens >= packetReceivedTokens
 
-    reliabilitySent = 1 - len(packetSentTokens - packetReceivedTokens) / float(len(packetSentTokens))
-    reliabilityCommanded = 1 - len(commandSendPacketTokens - packetReceivedTokens) / float(len(commandSendPacketTokens))
+        reliabilitySent += [1 - len(packetSentTokens - packetReceivedTokens) / float(len(packetSentTokens))]
+        reliabilityCommanded += [1 - len(commandSendPacketTokens - packetReceivedTokens) / float(len(commandSendPacketTokens))]
 
-    returnDict = {
-        "reliabilitySent"       : reliabilitySent,
-        "reliabilityCommanded"  : reliabilityCommanded
-    }
+        print "Experiment {0} Number of packets commanded: {1}".format(headerLine['experimentId'], len(commandSendPacketTokens))
 
-    print "Number of packets commanded: {0}".format(len(commandSendPacketTokens))
+
+    returnDict['reliabilitySent'] = {
+                                        'mean' : mean(reliabilitySent),
+                                        'min' : min(reliabilitySent),
+                                        'max' : max(reliabilitySent),
+                                        '99%' : numpy.percentile(reliabilitySent, 99)
+                                    }
+
+    returnDict['reliabilityCommanded'] = {
+                                        'mean' : mean(reliabilityCommanded),
+                                        'min' : min(reliabilityCommanded),
+                                        'max' : max(reliabilityCommanded),
+                                        '99%' : numpy.percentile(reliabilityCommanded, 99)
+                                    }
+
+
+    print "Reliabilities commanded: {0}".format(reliabilityCommanded)
+    print "Reliabilities sent: {0}".format(reliabilitySent)
     print returnDict
 
     return returnDict
