@@ -60,6 +60,7 @@ class Wizard:
 
 			if coinToss < 0.1: # this is a bursty sensor
 				role = 'bursty-sensor'
+				# period between 1 minute and 1 hour
 				period = random.randint(1 * 60, 60 * 60)
 				numPackets = 5
 				payloadSize = 80
@@ -67,7 +68,8 @@ class Wizard:
 				confirmable = False
 			else: # this is a monitoring sensor
 				role = 'sensor'
-				period = random.randint(1, 60)
+				# period between 10 and 60 seconds
+				period = random.randint(10, 60)
 				numPackets = 1
 				payloadSize = 10
 				destination = rootId
