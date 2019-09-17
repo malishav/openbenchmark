@@ -225,7 +225,7 @@ class PerformanceEventHandler(threading.Thread):
 			try:
 				self.messageQueue.put(payload, block=False)
 			except:
-				print "queue overflow"
+				print "queue overflow in PerformanceEventHandler, topic={0} payload={1}".format(message.topic, payload)
 		except:
 			print "Could not decode payload"
 
@@ -631,7 +631,7 @@ class OrchestrateExperiment(threading.Thread):
 				try:
 					self.messageQueue.put((tokenReceived, success), block=False)
 				except:
-					print "queue overflow"
+					print "queue overflow in OrchestrateExperiment on_mqtt_message. topic={0}".format(message.topic)
 
 			except:
 				self.failureCounter += 1
