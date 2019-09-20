@@ -278,6 +278,65 @@ def calculate_join_times(inputDir):
                     }
         }
 
+def calculate_duty_cycle(inputDir):
+
+    maximalDutyCyclePerRun = []
+    minimalDutyCyclePerRun = []
+    averageDutyCyclePerRun = []
+
+    for inputFile in glob.glob(os.path.join(inputDir, '*.log')):
+
+        dutyCycleDict = {}
+
+        with open(inputFile, "r") as f:
+            headerLine = json.loads(f.readline())
+
+            # first fetch the events of interest
+            for line in f:
+                candidate = json.loads(line)
+
+                # filter out the events of interest
+                if candidate['event'] == 'radioDutyCycleMeasurement':
+                    source = candidate['source']
+                    dutyCycle = float(candidate['dutyCycle'].strip("%"))
+
+                    if source not in dutyCycleDict:
+                        dutyCycleDict[source] = {
+                                                    'dutyCycle' : dutyCycle
+                                                }
+                    else:
+                        # just update the value with the latest cumulative measurement
+                        dutyCycleDict[source]['dutyCycle'] = dutyCycle
+
+        maximalDutyCyclePerRun += [ max([dutyCycleDict[key]['dutyCycle'] for key in dutyCycleDict]) ]
+        minimalDutyCyclePerRun += [ min([dutyCycleDict[key]['dutyCycle'] for key in dutyCycleDict]) ]
+        averageDutyCyclePerRun += [ mean([dutyCycleDict[key]['dutyCycle'] for key in dutyCycleDict]) ]
+
+    returnDict = {
+        "maxDutyCycle" : {
+                    'mean' : mean(maximalDutyCyclePerRun),
+                    'min'  : min(maximalDutyCyclePerRun),
+                    'max'  : max(maximalDutyCyclePerRun),
+                    '99%'  : numpy.percentile(maximalDutyCyclePerRun, 99)
+                },
+        "minDutyCycle": {
+                    'mean': mean(minimalDutyCyclePerRun),
+                    'min': min(minimalDutyCyclePerRun),
+                    'max': max(minimalDutyCyclePerRun),
+                    '99%': numpy.percentile(minimalDutyCyclePerRun, 99)
+                },
+        "averageDutyCycle": {
+                    'mean': mean(averageDutyCyclePerRun),
+                    'min': min(averageDutyCyclePerRun),
+                    'max': max(averageDutyCyclePerRun),
+                    '99%': numpy.percentile(averageDutyCyclePerRun, 99)
+                },
+    }
+
+    print returnDict
+
+    return returnDict
+
 def main():
 
     args = parser.parse_args()
@@ -288,6 +347,7 @@ def main():
     kpis.update(calculate_latency(inputDir))
     kpis.update(calculate_reliability(inputDir))
     kpis.update(calculate_join_times(inputDir))
+    kpis.update(calculate_duty_cycle(inputDir))
 
     with open(outputFile, "w") as f:
         json.dump(kpis, f, indent=4)
