@@ -125,8 +125,6 @@ def calculate_reliability(inputDir):
             # root is by convention always openbenchmark00 node
             root = headerLine['nodes']['openbenchmark00']['eui64']
 
-            print "Processing reliability for experiment {0} executed on {1}. Root eui64={2}".format(headerLine['experimentId'],
-                                                                                 headerLine['date'], root)
             # first fetch the events of interest
             for line in f:
                 candidate = json.loads(line)
@@ -161,14 +159,17 @@ def calculate_reliability(inputDir):
                     token = tuple(candidate['packetToken'])
                     commandSendPacketTokens.add(token)
 
-        reliabilitySentUpstream     += [1 - len(packetSentTokensUpstream - packetReceivedTokensUpstream) / float(len(packetSentTokensUpstream))] if len(packetSentTokensUpstream) else []
-        reliabilitySentDownstream   += [1 - len(packetSentTokensDownstream - packetReceivedTokensDownstream) / float(len(packetSentTokensDownstream))] if len(packetSentTokensDownstream) else []
-        reliabilitySentP2P          += [1 - len(packetSentTokensP2P - packetReceivedTokensP2P) / float(len(packetSentTokensP2P))] if len(packetSentTokensP2P) else []
+        ru = [1 - len(packetSentTokensUpstream - packetReceivedTokensUpstream) / float(len(packetSentTokensUpstream))] if len(packetSentTokensUpstream) else []
+        rd = [1 - len(packetSentTokensDownstream - packetReceivedTokensDownstream) / float(len(packetSentTokensDownstream))] if len(packetSentTokensDownstream) else []
+        rp2p = [1 - len(packetSentTokensP2P - packetReceivedTokensP2P) / float(len(packetSentTokensP2P))] if len(packetSentTokensP2P) else []
+        rs = [1 - len(commandSendPacketTokens - (packetSentTokensUpstream | packetSentTokensDownstream | packetSentTokensP2P)) / float(len(commandSendPacketTokens))]
 
-        reliabilitySerialPort        += [1 - len(commandSendPacketTokens - (packetSentTokensUpstream | packetSentTokensDownstream | packetSentTokensP2P)) / float(len(commandSendPacketTokens))]
+        reliabilitySentUpstream     += ru
+        reliabilitySentDownstream   += rd
+        reliabilitySentP2P          += rp2p
+        reliabilitySerialPort        += rs
 
-        print "Experiment {0} Number of packets commanded: {1}".format(headerLine['experimentId'], len(commandSendPacketTokens))
-
+        print "Experiment: {0}, root_eui64: {1} number of packets commanded: {2}, reliabilitySentUpstream: {3}, reliabilitySentDownstream: {4}, reliabilitySentP2P: {5}, reliabilitySerialPort: {6}".format(headerLine['experimentId'],root, len(commandSendPacketTokens), ru, rd, rp2p, rs)
 
     if len(reliabilitySentUpstream):
         returnDict['reliabilitySentUpstream'] = {
