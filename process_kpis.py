@@ -249,8 +249,7 @@ def main():
 
     args = parser.parse_args()
     inputDir = args.logDir
-    outputFile = os.path.join(args.logDir,  args.logDir.strip('/') + ".kpi")
-
+    outputFile = os.path.join(args.logDir,  args.logDir.split('/')[-1] + ".kpi")
     kpis = {}
 
     kpis.update(calculate_latency(inputDir))
