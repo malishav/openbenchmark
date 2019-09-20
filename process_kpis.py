@@ -19,6 +19,7 @@ def _match_packets_and_calculate_latency(packetSentEvents, packetReceivedEvents,
     latencies = {}
     latencies['average'] = []
     processedSet = set()
+    hopsTraversedSum = 0
     returnDict = {}
 
     # match the events according to the token
@@ -43,6 +44,8 @@ def _match_packets_and_calculate_latency(packetSentEvents, packetReceivedEvents,
 
                     latencies['average'] += [latency]
 
+                    hopsTraversedSum += float(hopsTraversed)
+
                     processedSet.add(tuple(tokenReceived))
                     break
 
@@ -52,6 +55,9 @@ def _match_packets_and_calculate_latency(packetSentEvents, packetReceivedEvents,
         if len(latencies[key]):
             returnDict['latency_{0}_{1}'.format(direction, key)] = mean(latencies[key])
 
+    if len(latencies['average']):
+        # hops traversed per packet is the sum of all hops each packet traversed divided by total number of packets
+        returnDict['hopsTraversedPerPacket_{0}'.format(direction)] = hopsTraversedSum / float(len(latencies['average']))
 
     return returnDict
 
@@ -72,13 +78,10 @@ def calculate_latency(inputDir):
         packetReceivedEventsP2P = []
 
         with open(inputFile, "r") as f:
-            print "Processing {0}".format(inputFile)
             headerLine = json.loads(f.readline())
 
             # root is by convention always openbenchmark00 node
             root = headerLine['nodes']['openbenchmark00']['eui64']
-
-            print "Processing latency for experiment {0} executed on {1}. Root eui64={2}.".format(headerLine['experimentId'], headerLine['date'], root)
 
             # first fetch the events of interest
             for line in f:
@@ -248,9 +251,6 @@ def calculate_join_times(inputDir):
 
         with open(inputFile, "r") as f:
             headerLine = json.loads(f.readline())
-
-            print "Processing join times for experiment {0} executed on {1}".format(headerLine['experimentId'],
-                                                                                 headerLine['date'])
 
             # first fetch the events of interest
             for line in f:
