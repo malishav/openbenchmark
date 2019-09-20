@@ -244,26 +244,6 @@ def calculate_join_times(inputDir):
                     }
         }
 
-def calculate_sync_times(inputFile):
-    syncInstants = []
-
-
-    with open(inputFile, "r") as f:
-        headerLine = json.loads(f.readline())
-
-        print "Processing sync times for experiment {0} executed on {1}".format(headerLine['experimentId'],
-                                                                             headerLine['date'])
-
-        # first fetch the events of interest
-        for line in f:
-            candidate = json.loads(line)
-
-            # filter out the events of interest
-            if candidate['event'] == 'synchronizationCompleted':
-                syncInstants += [candidate['timestamp']]
-
-    return {"syncInstants": syncInstants}
-
 def main():
 
     args = parser.parse_args()
@@ -275,7 +255,6 @@ def main():
     kpis.update(calculate_latency(inputDir))
     kpis.update(calculate_reliability(inputDir))
     kpis.update(calculate_join_times(inputDir))
-    #kpis.update(calculate_sync_times(inputDir))
 
     with open(outputFile, "w") as f:
         json.dump(kpis, f, indent=4)
