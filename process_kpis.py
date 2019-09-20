@@ -132,7 +132,6 @@ def calculate_latency(inputDir):
                                                      'min'          : min(returnDict[key]),
                                                      'max'          : max(returnDict[key]),
                                                      '99%'          : numpy.percentile(returnDict[key], 99),
-                                                      'numRuns'  : len(returnDict[key])
                                                      }
 
     print returnDict
