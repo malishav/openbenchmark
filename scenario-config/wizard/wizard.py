@@ -1,6 +1,7 @@
 import os
 import json
 import random
+import math
 from collections import OrderedDict
 
 
@@ -204,6 +205,136 @@ class Wizard:
 			'role': role,
 			'traffic_sending_points': trafficSendingPoints,
 		}
+
+		return nodes
+
+	def generate_building_automation(self, numNodes, experimentDuration):
+		nodes = {}
+		rolePerArea = ['area-controller', 'actuator','actuator', 'monitoring-sensor', 'monitoring-sensor','monitoring-sensor', 'event-sensor','event-sensor', 'event-sensor', 'event-sensor']
+		assert numNodes > 1
+
+		rootId = "openbenchmark00"
+		nodes[rootId] = {
+			'role' : 'zone-controller',
+			'traffic_sending_points' : [],
+		}
+
+		numAreas = int(math.ceil((numNodes - 1) / 10.0))  # 3 MS, 4 ES, 2 A, 1 AC
+
+		# assert that the last area consists of at least two nodes: an actuator and area controller
+		assert (numAreas-1) * 10 + 3 < numNodes, "Increase number of nodes for the last area to have at least 3."
+
+		for area in range(numAreas):
+			areaController = None
+			for i, role in enumerate(rolePerArea, start=1):
+
+				trafficSendingPoints = []
+
+				id = area * 10 + i
+
+				if id > numNodes - 1:
+					break
+
+				genericId = "openbenchmark{0}".format("%02d" % (id))
+
+				if role == "area-controller":
+
+					areaController = genericId
+
+					# quick-n-dirty: actuators are hard-coded to be id+1 and id+2 from the area-controller
+					actuators = ["openbenchmark{0}".format("%02d" % (id+1)), "openbenchmark{0}".format("%02d" % (id+2))]
+
+					# traffic from AC to ZC
+					period = random.randint(4, 8) # CBR 4-8 seconds
+
+					currentInstant = 0
+					while currentInstant < experimentDuration:
+						trafficSendingPoints += [
+							{'time_sec': currentInstant + period,
+							 'payload_size': 10,
+							 'destination': rootId,
+							 'confirmable': False,
+							 'packets_in_burst': 1,
+							 }
+						]
+						currentInstant += period
+					# now remove the element that overflowed
+					trafficSendingPoints.pop()
+
+
+					# traffic from AC to A
+					# FIXME change back to 10.0/3600
+					poissonMean = 100.0 / 3600  # 10 packets per hour
+					currentInstant = 0
+					while currentInstant < experimentDuration:
+						nextPacketArrival = random.expovariate(poissonMean)
+						trafficSendingPoints += [
+							{'time_sec': currentInstant + nextPacketArrival,
+							 'payload_size': 10,
+							 'destination': random.choice(actuators),
+							 'confirmable': True,
+							 'packets_in_burst': 1,
+							 }
+						]
+						currentInstant += nextPacketArrival
+					# now remove the element that overflowed
+					trafficSendingPoints.pop()
+
+					# sort the list by time_sec
+					trafficSendingPointsSorted = sorted(trafficSendingPoints, key = lambda j: j['time_sec'])
+					nodes[genericId] = {
+						'role': role,
+						'traffic_sending_points': trafficSendingPointsSorted,
+					}
+
+				if role == "actuator" or role == "monitoring-sensor":
+
+					assert areaController
+
+					period = random.randint(25, 35)
+
+					currentInstant = 0
+					while currentInstant < experimentDuration:
+						trafficSendingPoints += [
+							{'time_sec': currentInstant + period,
+							 'payload_size': 10,
+							 'destination': areaController,
+							 'confirmable': True,
+							 'packets_in_burst': 1,
+							 }
+						]
+						currentInstant += period
+					# now remove the element that overflowed
+					trafficSendingPoints.pop()
+
+					nodes[genericId] = {
+						'role': role,
+						'traffic_sending_points': trafficSendingPoints,
+					}
+
+				if role == "event-sensor":
+					assert areaController
+
+					poissonMean = 10.0 / 3600  # 10 packets per hour
+					currentInstant = 0
+					while currentInstant < experimentDuration:
+						nextPacketArrival = random.expovariate(poissonMean)
+						trafficSendingPoints += [
+							{'time_sec': currentInstant + nextPacketArrival,
+							 'payload_size': 10,
+							 'destination': areaController,
+							 'confirmable': True,
+							 'packets_in_burst': 1,
+							 }
+						]
+						currentInstant += nextPacketArrival
+					# now remove the element that overflowed
+					trafficSendingPoints.pop()
+
+					nodes[genericId] = {
+						'role': role,
+						'traffic_sending_points': trafficSendingPoints,
+					}
 
 		return nodes
 
