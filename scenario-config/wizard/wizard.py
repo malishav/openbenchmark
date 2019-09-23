@@ -254,8 +254,7 @@ class Wizard:
 
 
 					# traffic from AC to A
-					# FIXME change back to 10.0/3600
-					poissonMean = 100.0 / 3600  # 10 packets per hour
+					poissonMean = 10.0 / 3600  # 10 packets per hour
 
 					trafficSendingPoints += self._generate_poisson_instants(poissonMean,
 																			experimentDuration,
