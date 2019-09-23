@@ -39,9 +39,53 @@ class Wizard:
 		elif self.info['identifier'] == 'building-automation':
 			self.nodes = self.generate_building_automation(self.info['number_of_nodes'], self.info['duration_min'] * 60)
 
+		assert len(self.nodes) == self.info['number_of_nodes']
+
 		self.testbeds = self._generate_testbed_specific_template()
 
 		self._output_json(self.info, self.nodes, self.testbeds)
+
+	def _generate_periodic_instants(self, period, experimentDuration, payloadSize, destination, confirmable, numPacketsInBurst):
+
+		trafficSendingPoints = []
+
+		currentInstant = 0
+		while currentInstant < experimentDuration:
+			trafficSendingPoints += [
+				{	'time_sec'          : currentInstant + period,
+					  'payload_size'      : payloadSize,
+					  'destination'       : destination,
+					  'confirmable'       : confirmable,
+					  'packets_in_burst'  : numPacketsInBurst,
+					  }
+			]
+			currentInstant += period
+		# now remove the element that overflowed
+		trafficSendingPoints.pop()
+
+		return trafficSendingPoints
+
+	def _generate_poisson_instants(self, mean, experimentDuration, payloadSize, destination, confirmable, numPacketsInBurst):
+
+		trafficSendingPoints = []
+
+		currentInstant = 0
+
+		while currentInstant < experimentDuration:
+			nextPacketArrival = random.expovariate(mean)
+			trafficSendingPoints += [
+				{'time_sec': currentInstant + nextPacketArrival,
+				 'payload_size': payloadSize,
+				 'destination': random.choice(destination) if type(destination) is list else destination,
+				 'confirmable': confirmable,
+				 'packets_in_burst': numPacketsInBurst,
+				 }
+			]
+			currentInstant += nextPacketArrival
+		# now remove the element that overflowed
+		trafficSendingPoints.pop()
+
+		return trafficSendingPoints
 
 	def generate_industrial_monitoring(self, numNodes, experimentDuration):
 		nodes = {}
@@ -55,7 +99,6 @@ class Wizard:
 
 		for i in range(numNodes-1):
 			genericId = "openbenchmark{0}".format("%02d" % (i + 1))
-			trafficSendingPoints = []
 
 			coinToss = random.random()
 
@@ -76,24 +119,14 @@ class Wizard:
 				destination = rootId
 				confirmable = False
 
-			currentInstant = 0
-			while currentInstant < experimentDuration:
-				trafficSendingPoints += [
-					{	 'time_sec'          : currentInstant + period,
-						 'payload_size'      : payloadSize,
-						 'destination'       : destination,
-						 'confirmable'       : confirmable,
-						 'packets_in_burst'  : numPackets,
-					}
-				]
-				currentInstant += period
-
-			# now remove the element that overflowed
-			trafficSendingPoints.pop()
-
 			nodes[genericId] = {
 				'role': role,
-				'traffic_sending_points': trafficSendingPoints,
+				'traffic_sending_points': self._generate_periodic_instants(period,
+																	  experimentDuration,
+																	  payloadSize,
+																	  destination,
+																	  confirmable,
+																	  numPackets),
 			}
 
 		return nodes
@@ -111,7 +144,6 @@ class Wizard:
 
 		for i in range(numNodes-1):
 			genericId = "openbenchmark{0}".format("%02d" % (i + 1))
-			trafficSendingPoints = []
 
 			coinToss = random.random()
 
@@ -119,61 +151,39 @@ class Wizard:
 				role = 'event-sensor'
 				poissonMean = 10.0 / 3600 # 10 packets per hour
 
-				currentInstant = 0
-				while currentInstant < experimentDuration:
-					nextPacketArrival = random.expovariate(poissonMean)
-					trafficSendingPoints += [
-						{	'time_sec'            : currentInstant + nextPacketArrival,
-							  'payload_size'      : 10,
-							  'destination'       : rootId,
-							  'confirmable'       : True,
-							  'packets_in_burst'  : 1,
-							  }
-					]
-					currentInstant += nextPacketArrival
-
-				# now remove the element that overflowed
-				trafficSendingPoints.pop()
+				trafficSendingPoints = self._generate_poisson_instants(
+					poissonMean,
+					experimentDuration,
+					10,
+					rootId,
+					True,
+					1
+				)
 
 			elif coinToss < 0.21 + 0.3 : # this is an actuator
 				actuators += [genericId]
 				role = 'actuator'
 				period = random.randint(3 * 60, 5 * 60)
 
-				currentInstant = 0
-				while currentInstant < experimentDuration:
-					trafficSendingPoints += [
-						{	'time_sec'            : currentInstant + period,
-							  'payload_size'      : 10,
-							  'destination'       : rootId,
-							  'confirmable'       : True,
-							  'packets_in_burst'  : 1,
-							  }
-					]
-					currentInstant += period
-
-				# now remove the element that overflowed
-				trafficSendingPoints.pop()
+				trafficSendingPoints = self._generate_periodic_instants(
+					period,
+					experimentDuration,
+					10,
+					rootId,
+					True,
+					1
+				)
 
 			else: # this is a monitoring sensor
 				role = 'monitoring-sensor'
 				period = random.randint(3 * 60, 5 * 60)
 
-				currentInstant = 0
-				while currentInstant < experimentDuration:
-					trafficSendingPoints += [
-						{
-							'time_sec'           : currentInstant + period,
-						    'payload_size'       : 10,
-						    'destination'        : rootId,
-						    'confirmable'        : False,
-						    'packets_in_burst'   : 1,
-						 }
-					]
-					currentInstant += period
-
-				# now remove the element that overflowed
-				trafficSendingPoints.pop()
+				trafficSendingPoints = self._generate_periodic_instants(period,
+																		experimentDuration,
+																		10,
+																		rootId,
+																		False,
+																		1)
 
 			nodes[genericId] = {
 				'role': role,
@@ -183,23 +193,13 @@ class Wizard:
 		# Root remains
 		role = 'control-unit'
 		poissonMean = 10.0 / 3600  # 10 packets per hour
-		trafficSendingPoints = []
 
-		currentInstant = 0
-		while currentInstant < experimentDuration:
-			nextPacketArrival = random.expovariate(poissonMean)
-			trafficSendingPoints += [
-				{'time_sec': currentInstant + nextPacketArrival,
-				 'payload_size': 10,
-				 'destination': random.choice(actuators),
-				 'confirmable': False,
-				 'packets_in_burst': 5,
-				 }
-			]
-			currentInstant += nextPacketArrival
-
-		# now remove the element that overflowed
-		trafficSendingPoints.pop()
+		trafficSendingPoints = self._generate_poisson_instants(poissonMean,
+															   experimentDuration,
+															   10,
+															   actuators,
+															   False,
+															   5)
 
 		nodes[rootId] = {
 			'role': role,
@@ -228,8 +228,6 @@ class Wizard:
 			areaController = None
 			for i, role in enumerate(rolePerArea, start=1):
 
-				trafficSendingPoints = []
-
 				id = area * 10 + i
 
 				if id > numNodes - 1:
@@ -247,41 +245,28 @@ class Wizard:
 					# traffic from AC to ZC
 					period = random.randint(4, 8) # CBR 4-8 seconds
 
-					currentInstant = 0
-					while currentInstant < experimentDuration:
-						trafficSendingPoints += [
-							{'time_sec': currentInstant + period,
-							 'payload_size': 10,
-							 'destination': rootId,
-							 'confirmable': False,
-							 'packets_in_burst': 1,
-							 }
-						]
-						currentInstant += period
-					# now remove the element that overflowed
-					trafficSendingPoints.pop()
+					trafficSendingPoints = self._generate_periodic_instants(period,
+																			 experimentDuration,
+																			 10,
+																			 rootId,
+																			 False,
+																			 1)
 
 
 					# traffic from AC to A
 					# FIXME change back to 10.0/3600
 					poissonMean = 100.0 / 3600  # 10 packets per hour
-					currentInstant = 0
-					while currentInstant < experimentDuration:
-						nextPacketArrival = random.expovariate(poissonMean)
-						trafficSendingPoints += [
-							{'time_sec': currentInstant + nextPacketArrival,
-							 'payload_size': 10,
-							 'destination': random.choice(actuators),
-							 'confirmable': True,
-							 'packets_in_burst': 1,
-							 }
-						]
-						currentInstant += nextPacketArrival
-					# now remove the element that overflowed
-					trafficSendingPoints.pop()
+
+					trafficSendingPoints += self._generate_poisson_instants(poissonMean,
+																			experimentDuration,
+																			10,
+																			actuators,
+																			True,
+																			1)
 
 					# sort the list by time_sec
 					trafficSendingPointsSorted = sorted(trafficSendingPoints, key = lambda j: j['time_sec'])
+
 					nodes[genericId] = {
 						'role': role,
 						'traffic_sending_points': trafficSendingPointsSorted,
@@ -293,19 +278,12 @@ class Wizard:
 
 					period = random.randint(25, 35)
 
-					currentInstant = 0
-					while currentInstant < experimentDuration:
-						trafficSendingPoints += [
-							{'time_sec': currentInstant + period,
-							 'payload_size': 10,
-							 'destination': areaController,
-							 'confirmable': True,
-							 'packets_in_burst': 1,
-							 }
-						]
-						currentInstant += period
-					# now remove the element that overflowed
-					trafficSendingPoints.pop()
+					trafficSendingPoints = self._generate_periodic_instants(period,
+																			experimentDuration,
+																			10,
+																			areaController,
+																			True,
+																			1)
 
 					nodes[genericId] = {
 						'role': role,
@@ -316,20 +294,13 @@ class Wizard:
 					assert areaController
 
 					poissonMean = 10.0 / 3600  # 10 packets per hour
-					currentInstant = 0
-					while currentInstant < experimentDuration:
-						nextPacketArrival = random.expovariate(poissonMean)
-						trafficSendingPoints += [
-							{'time_sec': currentInstant + nextPacketArrival,
-							 'payload_size': 10,
-							 'destination': areaController,
-							 'confirmable': True,
-							 'packets_in_burst': 1,
-							 }
-						]
-						currentInstant += nextPacketArrival
-					# now remove the element that overflowed
-					trafficSendingPoints.pop()
+
+					trafficSendingPoints = self._generate_poisson_instants(poissonMean,
+																		   experimentDuration,
+																		   10,
+																		   areaController,
+																		   True,
+																		   1)
 
 					nodes[genericId] = {
 						'role': role,
