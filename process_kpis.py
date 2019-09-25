@@ -76,6 +76,8 @@ def calculate_latency(inputDir):
         packetReceivedEventsDownstream = []
         packetSentEventsP2P = []
         packetReceivedEventsP2P = []
+        packetSentEventsBurst = []
+        packetReceivedEventsBurst = []
 
         with open(inputFile, "r") as f:
             headerLine = json.loads(f.readline())
@@ -103,10 +105,17 @@ def calculate_latency(inputDir):
                 elif candidate['event'] == 'packetReceived':
                     packetReceivedEventsP2P += [candidate]
 
+                # burst packets
+                if candidate['event'] == 'packetSent' and candidate['packetToken'][0] != 0:
+                    packetSentEventsBurst += [candidate]
+                elif candidate['event'] == 'packetReceived' and candidate['packetToken'][0] != 0:
+                    packetReceivedEventsBurst += [candidate]
+
 
         upstreamDictPerRun      = _match_packets_and_calculate_latency(packetSentEventsUpstream, packetReceivedEventsUpstream, 'upstream')
         downstreamDictPerRun    = _match_packets_and_calculate_latency(packetSentEventsDownstream, packetReceivedEventsDownstream, 'downstream')
         P2PDictPerRun           = _match_packets_and_calculate_latency(packetSentEventsP2P, packetReceivedEventsP2P, 'P2P')
+        burstDictPerRun         = _match_packets_and_calculate_latency(packetSentEventsBurst, packetReceivedEventsBurst, 'burst')
 
         for key in upstreamDictPerRun:
             if key in returnDict:
@@ -126,6 +135,12 @@ def calculate_latency(inputDir):
             else:
                 returnDict[key] = [P2PDictPerRun[key]]
 
+        for key in burstDictPerRun:
+            if key in returnDict:
+                returnDict[key] += [burstDictPerRun[key]]
+            else:
+                returnDict[key] = [burstDictPerRun[key]]
+
     for key in returnDict:
         returnDict[key] =                 {
                                                      'mean'         : mean(returnDict[key]),
@@ -141,6 +156,7 @@ def calculate_reliability(inputDir):
     reliabilitySentUpstream = []
     reliabilitySentDownstream = []
     reliabilitySentP2P = []
+    reliabilitySentBurst = []
     reliabilitySerialPort = []
     returnDict = {}
 
@@ -152,6 +168,8 @@ def calculate_reliability(inputDir):
         packetReceivedTokensDownstream = set()
         packetSentTokensP2P = set()
         packetReceivedTokensP2P = set()
+        packetSentTokensBurst = set()
+        packetReceivedTokensBurst = set()
         commandSendPacketTokens = set()
 
         with open(inputFile, "r") as f:
@@ -177,6 +195,10 @@ def calculate_reliability(inputDir):
                         # P2P packet
                         packetSentTokensP2P.add(token)
 
+                    # burst packet
+                    if token[0] != 0:
+                        packetSentTokensBurst.add(token)
+
                 elif candidate['event'] == 'packetReceived':
                     token = tuple(candidate['packetToken'])
                     if candidate['source'] == root:
@@ -189,6 +211,10 @@ def calculate_reliability(inputDir):
                         # P2P packet
                         packetReceivedTokensP2P.add(token)
 
+                    # burst packet
+                    if token[0] != 0:
+                        packetReceivedTokensBurst.add(token)
+
                 elif candidate['event'] == 'command' and candidate['type'] == 'sendPacket':
 
                     token = tuple(candidate['packetToken'])
@@ -197,14 +223,16 @@ def calculate_reliability(inputDir):
         ru = [1 - len(packetSentTokensUpstream - packetReceivedTokensUpstream) / float(len(packetSentTokensUpstream))] if len(packetSentTokensUpstream) else []
         rd = [1 - len(packetSentTokensDownstream - packetReceivedTokensDownstream) / float(len(packetSentTokensDownstream))] if len(packetSentTokensDownstream) else []
         rp2p = [1 - len(packetSentTokensP2P - packetReceivedTokensP2P) / float(len(packetSentTokensP2P))] if len(packetSentTokensP2P) else []
+        rb = [1 - len(packetSentTokensBurst - packetReceivedTokensBurst) / float(len(packetSentTokensBurst))] if len(packetSentTokensBurst) else []
         rs = [1 - len(commandSendPacketTokens - (packetSentTokensUpstream | packetSentTokensDownstream | packetSentTokensP2P)) / float(len(commandSendPacketTokens))]
 
         reliabilitySentUpstream     += ru
         reliabilitySentDownstream   += rd
         reliabilitySentP2P          += rp2p
-        reliabilitySerialPort        += rs
+        reliabilitySentBurst        += rb
+        reliabilitySerialPort       += rs
 
-        print "Experiment: {0}, root_eui64: {1} number of packets commanded: {2}, reliabilitySentUpstream: {3}, reliabilitySentDownstream: {4}, reliabilitySentP2P: {5}, reliabilitySerialPort: {6}".format(headerLine['experimentId'],root, len(commandSendPacketTokens), ru, rd, rp2p, rs)
+        print "Experiment: {0}, root_eui64: {1} number of packets commanded: {2}, reliabilitySentUpstream: {3}, reliabilitySentDownstream: {4}, reliabilitySentP2P: {5}, reliabilitySentBurst: {6}, reliabilitySerialPort: {7}".format(headerLine['experimentId'],root, len(commandSendPacketTokens), ru, rd, rp2p, rb, rs)
 
     if len(reliabilitySentUpstream):
         returnDict['reliabilitySentUpstream'] = {
@@ -227,6 +255,14 @@ def calculate_reliability(inputDir):
                                             'min' : min(reliabilitySentP2P),
                                             'max' : max(reliabilitySentP2P),
                                             '99%' : numpy.percentile(reliabilitySentP2P, 99)
+                                        }
+
+    if len(reliabilitySentBurst):
+        returnDict['reliabilitySentBurst'] = {
+                                            'mean' : mean(reliabilitySentBurst),
+                                            'min' : min(reliabilitySentBurst),
+                                            'max' : max(reliabilitySentBurst),
+                                            '99%' : numpy.percentile(reliabilitySentBurst, 99)
                                         }
 
     if len(reliabilitySerialPort):
