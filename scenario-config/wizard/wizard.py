@@ -244,7 +244,7 @@ class Wizard:
 					actuators = ["openbenchmark{0}".format("%02d" % (id+1)), "openbenchmark{0}".format("%02d" % (id+2))]
 
 					# traffic from AC to ZC
-					period = random.randint(4, 8) # CBR 4-8 seconds
+					period = random.uniform(8.0, 12.0) # CBR 4-8 seconds
 
 					trafficSendingPoints = self._generate_periodic_instants(period,
 																			 experimentDuration,
@@ -276,7 +276,7 @@ class Wizard:
 
 					assert areaController
 
-					period = random.randint(25, 35)
+					period = random.uniform(25.0, 35.0)
 
 					trafficSendingPoints = self._generate_periodic_instants(period,
 																			experimentDuration,
