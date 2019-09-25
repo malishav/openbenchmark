@@ -49,10 +49,11 @@ class Wizard:
 
 		trafficSendingPoints = []
 
-		currentInstant = 0
+		# random delay at the beginning to desync nodes
+		currentInstant = random.uniform(0, period)
 		while currentInstant < experimentDuration:
 			trafficSendingPoints += [
-				{	'time_sec'          : currentInstant + period,
+				{	'time_sec'          : currentInstant,
 					  'payload_size'      : payloadSize,
 					  'destination'       : destination,
 					  'confirmable'       : confirmable,
