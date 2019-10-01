@@ -301,7 +301,7 @@ def calculate_join_times(inputDir):
                         # node must have rebooted, skip any but the first join instant
                         pass
 
-        print "Number of join instants: {0}".format(len(joinDict.values()))
+        print "Experiment {0}, number of join instants: {1}".format(headerLine['experimentId'], len(joinDict.values()))
         maxJoinTimes += [max(joinDict.values())] if len(joinDict.values()) != 0 else []
 
     return {
